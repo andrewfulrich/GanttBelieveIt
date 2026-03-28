@@ -3,7 +3,7 @@ const serve = require('koa-static');
 
 const app = new Koa();
 
-app.use(serve('./public'));
+app.use(serve('./docs'));
 
 app.listen(3000);
 
