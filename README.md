@@ -2,6 +2,8 @@
 
 A simple, lightweight Gantt chart application that runs entirely in your browser. Plan projects with drag-and-drop task management, multiple swimlanes, and intuitive scheduling.
 
+Check it out at https://andrewfulrich.github.io/GanttBelieveIt/
+
 ## Features
 
 - **Drag & Drop Tasks**: Easily move and resize tasks on the timeline
