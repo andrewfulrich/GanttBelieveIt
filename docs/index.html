@@ -357,9 +357,9 @@
                 window.addEventListener('mouseup', handleMouseUp);
             };
 
-            const totalDaysCount = 120;
-            const timelineDays = Array.from({ length: totalDaysCount }, (_, i) => i);
             const projectEndDay = useMemo(() => tasks.length > 0 ? Math.max(...tasks.map(t => t.start + t.duration)) : 0, [tasks]);
+            const totalDaysCount = Math.max(90, projectEndDay);
+            const timelineDays = Array.from({ length: totalDaysCount }, (_, i) => i);
 
             return html`
                 <div class="flex flex-col h-screen overflow-auto text-slate-800">
