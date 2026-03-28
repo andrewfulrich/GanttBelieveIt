@@ -53,7 +53,7 @@
             backdrop-filter: blur(2px);
         }
 
-        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar { width: 12px; height: 12px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 5px; border: 2px solid #f1f1f1; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
@@ -74,6 +74,8 @@
             text-shadow: 
                 0 0 4px rgba(0,0,0,0.9), 
                 0 0 2px rgba(0,0,0,1),
+                0 0 1px rgba(0,0,0,1),
+                0 0 3px rgba(0,0,0,1),
                 0 0 8px rgba(0,0,0,0.4);
             color: white;
         }
@@ -387,7 +389,7 @@
 
                     <div class="flex-1 flex overflow-hidden relative" ref=${containerRef}>
                         <div class="w-[250px] bg-white border-r flex-shrink-0 z-40 flex flex-col shadow-xl">
-                            <div class="h-12 border-b bg-slate-50 flex items-center px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Swimlanes</div>
+                            <div class="h-12 border-b bg-slate-50 flex items-center px-4 text-[12px] font-black text-slate-400 uppercase tracking-widest">Swimlanes</div>
                             <div class="flex-1 overflow-y-auto overflow-x-hidden relative">
                                 <div style="transform: translateY(${-containerScroll.top}px)">
                                     ${rowLabels.map((label, i) => {
@@ -404,19 +406,19 @@
                                                     </div>`
                                                     : html`<div onClick=${() => setEditingRowIdx(i)} class="flex-1 flex flex-col justify-center cursor-pointer select-none py-1">
                                                         <span class="text-sm font-bold text-slate-700 truncate">${label}</span>
-                                                        <span class="text-[10px] text-slate-400 font-medium">${hasTasks ? `Days ${startDay}-${endDay}` : 'No tasks scheduled'}</span>
+                                                        <span class="text-[12px] text-slate-400 font-medium">${hasTasks ? `Days ${startDay}-${endDay}` : 'No tasks scheduled'}</span>
                                                     </div>`
                                                 }
                                                 ${confirmDeleteRowIdx === i && html`<div class="absolute inset-0 bg-white/95 z-50 flex items-center justify-center gap-2 px-2">
-                                                    <span class="text-[10px] font-bold text-slate-500 uppercase">Delete?</span>
+                                                    <span class="text-[12px] font-bold text-slate-500 uppercase">Delete?</span>
                                                     <button onMouseDown=${() => {
                                                         const newLabels = rowLabels.filter((_, idx) => idx !== i);
                                                         setRowLabels(newLabels);
                                                         setTasks(tasks.filter(t => t.row !== i).map(t => t.row > i ? { ...t, row: t.row - 1 } : t));
                                                         setConfirmDeleteRowIdx(null);
                                                         setEditingRowIdx(null);
-                                                    }} class="bg-rose-600 text-white text-[10px] px-2 py-1 rounded">Yes</button>
-                                                    <button onMouseDown=${() => setConfirmDeleteRowIdx(null)} class="bg-slate-200 text-slate-700 text-[10px] px-2 py-1 rounded">No</button>
+                                                    }} class="bg-rose-600 text-white text-[12px] px-2 py-1 rounded">Yes</button>
+                                                    <button onMouseDown=${() => setConfirmDeleteRowIdx(null)} class="bg-slate-200 text-slate-700 text-[12px] px-2 py-1 rounded">No</button>
                                                 </div>`}
                                             </div>`;
                                     })}
@@ -471,15 +473,15 @@
                                                 `
                                                 : html`
                                                     <div class="task-label-container">
-                                                        <div class="text-xs font-bold leading-tight">${task.name}</div>
-                                                        <div class="text-[9px] font-medium opacity-80 leading-tight">${task.duration} ${task.duration === 1 ? 'Day' : 'Days'}</div>
+                                                        <div class="text-sm font-bold leading-tight">${task.name}</div>
+                                                        <div class="text-[12px] font-medium opacity-80 leading-tight">ID: ${task.id}, Days: ${task.duration}</div>
                                                     </div>`
                                             }
 
                                             ${confirmDeleteId === task.id && html`
                                                 <div class="absolute inset-0 rounded-lg delete-confirm-overlay z-[70] flex items-center justify-around px-1">
-                                                    <button onMouseDown=${(e) => { e.stopPropagation(); setTasks(tasks.filter(t => t.id !== task.id)); setConfirmDeleteId(null); setEditingTaskId(null); }} class="text-[10px] bg-rose-600 text-white px-2 py-1 rounded font-bold">Delete?</button>
-                                                    <button onMouseDown=${(e) => { e.stopPropagation(); setConfirmDeleteId(null); }} class="text-[10px] bg-slate-200 text-slate-700 px-2 py-1 rounded font-bold">No</button>
+                                                    <button onMouseDown=${(e) => { e.stopPropagation(); setTasks(tasks.filter(t => t.id !== task.id)); setConfirmDeleteId(null); setEditingTaskId(null); }} class="text-[12px] bg-rose-600 text-white px-2 py-1 rounded font-bold">Delete?</button>
+                                                    <button onMouseDown=${(e) => { e.stopPropagation(); setConfirmDeleteId(null); }} class="text-[12px] bg-slate-200 text-slate-700 px-2 py-1 rounded font-bold">No</button>
                                                 </div>`}
                                         </div>`;
                                 })}
@@ -487,7 +489,7 @@
                         </div>
                     </div>
 
-                    <footer class="bg-white border-t px-6 py-2 text-[10px] text-slate-400 flex justify-between uppercase tracking-widest font-bold">
+                    <footer class="bg-white border-t px-6 py-2 text-[12px] text-slate-400 flex justify-between uppercase tracking-widest font-bold">
                         <div class="flex gap-8 items-center">
                             <span>Tasks: <span class="text-slate-900">${tasks.length}</span></span>
                             <span>Project Span: <span class="text-slate-900">${projectEndDay} Days</span></span>
