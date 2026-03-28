@@ -362,8 +362,8 @@
             const projectEndDay = useMemo(() => tasks.length > 0 ? Math.max(...tasks.map(t => t.start + t.duration)) : 0, [tasks]);
 
             return html`
-                <div class="flex flex-col h-screen overflow-hidden text-slate-800">
-                    <header class="bg-white border-b px-6 py-4 flex items-center justify-between shadow-sm z-50">
+                <div class="flex flex-col h-screen overflow-auto text-slate-800">
+                    <header class="bg-white border-b px-6 py-4 flex items-center justify-between shadow-sm" style="position: sticky; top: 0; left: 0; z-index: 50;">
                         <div class="flex items-center gap-3">
                             <div class="bg-indigo-600 p-2 rounded-lg shadow-inner">
                                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h2a2 2 0 00-2 2"></path></svg>
@@ -387,8 +387,8 @@
                         </div>
                     </header>
 
-                    <div class="flex-1 flex overflow-hidden relative" ref=${containerRef}>
-                        <div class="w-[250px] bg-white border-r flex-shrink-0 z-40 flex flex-col shadow-xl">
+                    <div class="flex-1 flex overflow-visible relative" ref=${containerRef}>
+                        <div class="w-[250px] bg-white border-r flex-shrink-0 flex flex-col shadow-xl" style="position: sticky; left: 0; z-index: 1001">
                             <div class="h-12 border-b bg-slate-50 flex items-center px-4 text-[12px] font-black text-slate-400 uppercase tracking-widest">Swimlanes</div>
                             <div class="flex-1 overflow-y-auto overflow-x-hidden relative">
                                 <div style="transform: translateY(${-containerScroll.top}px)">
@@ -427,8 +427,8 @@
                             </div>
                         </div>
 
-                        <div class="flex-1 overflow-auto relative bg-white" onScroll=${(e) => setContainerScroll({ left: e.target.scrollLeft, top: e.target.scrollTop })}>
-                            <div class="sticky top-0 z-30 bg-slate-50 border-b shadow-sm">
+                        <div class="flex-1 overflow-visible relative bg-white" onScroll=${(e) => setContainerScroll({ left: e.target.scrollLeft, top: e.target.scrollTop })}>
+                            <div class="sticky top-0 bg-slate-50 border-b shadow-sm">
                                 <div class="flex border-b border-slate-200">
                                     ${Array.from({ length: Math.ceil(totalDaysCount / 5) }).map((_, i) => html`
                                         <div key=${i} style="width: ${dayWidth * 5}px" class="flex-shrink-0 border-r border-slate-200 flex items-center justify-center text-[9px] font-black text-indigo-600 uppercase tracking-widest h-5 bg-indigo-50/30">Week ${i + 1}</div>
@@ -443,9 +443,24 @@
                                     const isEditing = editingTaskId === task.id;
                                     const displayTask = isDragging ? draggingTask : task;
                                     
+                                    const rowTasks = tasks.filter(t => t.row === displayTask.row).sort((a,b)=>a.start-b.start);
+                                    const taskIndex = rowTasks.findIndex(t => t.id === displayTask.id);
+                                    const hasNextTask = taskIndex < rowTasks.length - 1;
+                                    const measureTextWidth = (text, fontSize, fontWeight) => {
+                                        const canvas = document.createElement('canvas');
+                                        const ctx = canvas.getContext('2d');
+                                        ctx.font = `${fontWeight} ${fontSize}px Inter`;
+                                        return ctx.measureText(text).width;
+                                    };
+                                    const nameWidth = measureTextWidth(task.name, 14, 'bold');
+                                    const infoWidth = measureTextWidth(`ID: ${task.id}, Days: ${task.duration}`, 12, '500');
+                                    const labelWidth = Math.max(nameWidth, infoWidth);
+                                    const taskWidth = displayTask.duration * dayWidth - 4;
+                                    const shouldRotate = labelWidth > taskWidth && hasNextTask;
+                                    
                                     return html`
                                         <div key=${task.id} data-task-id=${task.id} onMouseDown=${(e) => onMouseDown(e, task)}
-                                            class="absolute task-bar group rounded-lg border border-black/10 flex flex-col justify-center px-3 text-white shadow-sm ${isDragging ? 'opacity-30 z-0' : 'z-10 hover:shadow-lg'}"
+                                            class="absolute task-bar group rounded-lg border border-black/10 flex flex-col justify-center px-3 text-white shadow-sm ${isDragging ? 'opacity-30 z-0' : 'hover:shadow-lg'}"
                                             style="left: ${displayTask.start * dayWidth + 2}px; top: ${displayTask.row * ROW_HEIGHT + 10}px; width: ${displayTask.duration * dayWidth - 4}px; height: 42px; background-color: ${displayTask.color}; pointer-events: ${isDragging && dragInfo.current.mode === 'move' ? 'none' : 'auto'};">
                                             
                                             <div class="resize-handle-l"></div>
@@ -472,7 +487,7 @@
                                                     </div>
                                                 `
                                                 : html`
-                                                    <div class="task-label-container">
+                                                    <div class="task-label-container" style=${shouldRotate ? 'transform: rotate(-30deg) translateX(0); transform-origin: left center; z-index: 1000;' : ''}>
                                                         <div class="text-sm font-bold leading-tight">${task.name}</div>
                                                         <div class="text-[12px] font-medium opacity-80 leading-tight">ID: ${task.id}, Days: ${task.duration}</div>
                                                     </div>`
@@ -489,7 +504,7 @@
                         </div>
                     </div>
 
-                    <footer class="bg-white border-t px-6 py-2 text-[12px] text-slate-400 flex justify-between uppercase tracking-widest font-bold">
+                    <footer class="bg-white border-t px-6 py-2 text-[12px] text-slate-400 flex justify-between uppercase tracking-widest font-bold" style="position: sticky; bottom: 0; left: 0; z-index: 50;">
                         <div class="flex gap-8 items-center">
                             <span>Tasks: <span class="text-slate-900">${tasks.length}</span></span>
                             <span>Project Span: <span class="text-slate-900">${projectEndDay} Days</span></span>
