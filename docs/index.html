@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gantt Believe It! - Interactive Project Planner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+        
+        .gantt-grid {
+            background-image: 
+                linear-gradient(to right, #cbd5e1 1px, transparent 1px),
+                linear-gradient(to bottom, #cbd5e1 1px, transparent 1px);
+        }
+
+        .task-bar {
+            cursor: grab;
+            touch-action: none;
+            user-select: none;
+            overflow: visible !important;
+        }
+        .task-bar:active { cursor: grabbing; }
+        
+        /* Resize Handles */
+        .resize-handle-l, .resize-handle-r {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 8px;
+            cursor: ew-resize;
+            z-index: 20;
+        }
+        .resize-handle-l { left: 0; }
+        .resize-handle-r { right: 0; }
+
+        .editable-input {
+            background: white;
+            color: black;
+            border: none;
+            outline: 2px solid #4f46e5;
+            border-radius: 4px;
+            width: 100%;
+            min-width: 180px; /* Ensures input is usable even on 1-day tasks */
+            padding: 0 4px;
+            font-weight: inherit;
+            position: relative;
+            z-index: 60;
+        }
+
+        .delete-confirm-overlay {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(2px);
+        }
+
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 5px; border: 2px solid #f1f1f1; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .modal-overlay {
+            background-color: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        /* Label styling with heavy centered shadow for legibility */
+        .task-label-container {
+            position: absolute;
+            left: 12px;
+            right: -300px;
+            pointer-events: none;
+            white-space: nowrap;
+            /* Heavy centered shadow (glow effect) */
+            text-shadow: 
+                0 0 4px rgba(0,0,0,0.9), 
+                0 0 2px rgba(0,0,0,1),
+                0 0 8px rgba(0,0,0,0.4);
+            color: white;
+        }
+
+        /* Styling the native color picker to look like a button */
+        .native-color-picker {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            cursor: pointer;
+            background: none;
+        }
+        .native-color-picker::-webkit-color-swatch-wrapper {
+            padding: 4px;
+        }
+        .native-color-picker::-webkit-color-swatch {
+            border: none;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+    <script type="module">
+        import { h, render, Component } from 'https://esm.sh/preact';
+        import { useState, useEffect, useRef, useCallback, useMemo } from 'https://esm.sh/preact/hooks';
+        import htm from 'https://esm.sh/htm';
+
+        const html = htm.bind(h);
+
+        const DAY_WIDTH_BASE = 40;
+        const ROW_HEIGHT = 60;
+        const STORAGE_KEY = 'gantt-believe-it-data-v8';
+
+        const JSON_SCHEMA = {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "properties": {
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": { "type": "string" },
+                            "name": { "type": "string" },
+                            "start": { "type": "number" },
+                            "duration": { "type": "number" },
+                            "row": { "type": "number" },
+                            "color": { "type": "string", "description": "Hex color string" }
+                        },
+                        "required": ["id", "name", "start", "duration", "row", "color"]
+                    }
+                },
+                "rowLabels": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                }
+            },
+            "required": ["tasks", "rowLabels"]
+        };
+
+        const initialTasks = [
+            { id: '1', name: 'Planning Phase', start: 2, duration: 5, row: 0, color: '#6366f1' },
+            { id: '2', name: 'Design Concepts', start: 8, duration: 4, row: 1, color: '#10b981' },
+        ];
+
+        const initialRowLabels = ["Strategic Planning", "UX Design"];
+
+        const App = () => {
+            const [tasks, setTasks] = useState(() => {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                return saved ? JSON.parse(saved).tasks : initialTasks;
+            });
+            const [rowLabels, setRowLabels] = useState(() => {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                return saved ? JSON.parse(saved).rowLabels : initialRowLabels;
+            });
+
+            const [zoom, setZoom] = useState(1);
+            const [draggingTask, setDraggingTask] = useState(null);
+            const [containerScroll, setContainerScroll] = useState({ left: 0, top: 0 });
+            
+            const [editingTaskId, setEditingTaskId] = useState(null);
+            const [editingRowIdx, setEditingRowIdx] = useState(null);
+            const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+            const [confirmDeleteRowIdx, setConfirmDeleteRowIdx] = useState(null);
+            const [isHelpOpen, setIsHelpOpen] = useState(false);
+            
+            const dayWidth = DAY_WIDTH_BASE * zoom;
+            const containerRef = useRef(null);
+            const fileInputRef = useRef(null);
+            
+            const dragInfo = useRef({ 
+                task: null, startX: 0, startY: 0, offsetX: 0, offsetY: 0, 
+                hasMoved: false, mode: 'move', originalStart: 0, originalDuration: 0
+            });
+
+            useEffect(() => {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, rowLabels }));
+            }, [tasks, rowLabels]);
+
+            useEffect(() => {
+                const handleClickOutside = (e) => {
+                    if (editingTaskId) {
+                        const isTaskElement = e.target.closest(`[data-task-id="${editingTaskId}"]`);
+                        const isToolbar = e.target.closest('.edit-toolbar');
+                        if (!isTaskElement && !isToolbar) {
+                            setEditingTaskId(null);
+                            setConfirmDeleteId(null);
+                        }
+                    }
+                    if (editingRowIdx !== null) {
+                        const isRowElement = e.target.closest(`[data-row-idx="${editingRowIdx}"]`);
+                        if (!isRowElement) {
+                            setEditingRowIdx(null);
+                            setConfirmDeleteRowIdx(null);
+                        }
+                    }
+                };
+                window.addEventListener('mousedown', handleClickOutside);
+                return () => window.removeEventListener('mousedown', handleClickOutside);
+            }, [editingTaskId, editingRowIdx]);
+
+            const exportData = () => {
+                const data = JSON.stringify({ tasks, rowLabels }, null, 2);
+                const blob = new Blob([data], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `gantt-export-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            };
+
+            const importData = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const json = JSON.parse(event.target.result);
+                        if (json.tasks && json.rowLabels) {
+                            setTasks(json.tasks);
+                            setRowLabels(json.rowLabels);
+                        }
+                    } catch (err) { console.error(err); }
+                };
+                reader.readAsText(file);
+                e.target.value = null;
+            };
+
+            const addTask = () => {
+                let currentLabels = [...rowLabels];
+                if (currentLabels.length === 0) {
+                    currentLabels = ["General Tasks"];
+                    setRowLabels(currentLabels);
+                }
+                const firstLaneTasks = tasks.filter(t => t.row === 0);
+                let newStart = 0;
+                if (firstLaneTasks.length > 0) {
+                    newStart = Math.max(...firstLaneTasks.map(t => t.start + t.duration));
+                } else {
+                    newStart = Math.floor(containerScroll.left / dayWidth);
+                }
+                const newId = Date.now().toString();
+                const newTask = {
+                    id: newId,
+                    name: 'New Task',
+                    start: newStart,
+                    duration: 4,
+                    row: 0,
+                    color: '#6366f1'
+                };
+                setTasks([...tasks, newTask]);
+                setEditingTaskId(newId);
+            };
+
+            const updateTaskName = (id, name) => {
+                setTasks(tasks.map(t => t.id === id ? { ...t, name } : t));
+            };
+
+            const updateTaskColor = (id, color) => {
+                setTasks(tasks.map(t => t.id === id ? { ...t, color } : t));
+            };
+
+            const updateRowLabel = (idx, label) => {
+                const newLabels = [...rowLabels];
+                newLabels[idx] = label;
+                setRowLabels(newLabels);
+            };
+
+            const finalizeMove = (movedTask) => {
+                setTasks(prevTasks => {
+                    let otherTasks = prevTasks.filter(t => t.id !== movedTask.id);
+                    let rowTasks = otherTasks.filter(t => t.row === movedTask.row).sort((a, b) => a.start - b.start);
+
+                    let finalStart = movedTask.start;
+                    if (dragInfo.current.mode === 'move') {
+                        for (let i = 0; i < rowTasks.length; i++) {
+                            const current = rowTasks[i];
+                            if (finalStart >= current.start && finalStart < (current.start + current.duration)) {
+                                finalStart = current.start + current.duration;
+                            }
+                        }
+                    }
+
+                    const updatedMovedTask = { ...movedTask, start: finalStart };
+                    let newTaskList = [...otherTasks, updatedMovedTask];
+                    newTaskList.sort((a, b) => (a.row !== b.row) ? a.row - b.row : a.start - b.start);
+                    
+                    for (let r = 0; r < rowLabels.length; r++) {
+                        let rTasks = newTaskList.filter(t => t.row === r);
+                        for (let i = 1; i < rTasks.length; i++) {
+                            if (rTasks[i].start < rTasks[i-1].start + rTasks[i-1].duration) {
+                                rTasks[i].start = rTasks[i-1].start + rTasks[i-1].duration;
+                            }
+                        }
+                    }
+                    return [...newTaskList];
+                });
+            };
+
+            const handleMouseMove = useCallback((e) => {
+                if (!dragInfo.current.task) return;
+                const dx = Math.abs(e.clientX - dragInfo.current.startX);
+                const dy = Math.abs(e.clientY - dragInfo.current.startY);
+                if (dx > 3 || dy > 3) dragInfo.current.hasMoved = true;
+                if (!dragInfo.current.hasMoved) return;
+
+                const containerRect = containerRef.current.getBoundingClientRect();
+                const mouseX = e.clientX - containerRect.left - 250 + containerRef.current.scrollLeft;
+                const mouseY = e.clientY - containerRect.top - 48 + containerRef.current.scrollTop;
+                const currentDay = Math.floor(mouseX / dayWidth);
+
+                let updated = { ...dragInfo.current.task };
+                if (dragInfo.current.mode === 'resize-r') {
+                    updated.duration = Math.max(1, currentDay - dragInfo.current.task.start + 1);
+                } else if (dragInfo.current.mode === 'resize-l') {
+                    const originalEnd = dragInfo.current.originalStart + dragInfo.current.originalDuration;
+                    const newStart = Math.min(originalEnd - 1, Math.max(0, currentDay));
+                    updated.start = newStart;
+                    updated.duration = originalEnd - newStart;
+                } else {
+                    updated.start = Math.max(0, Math.floor((mouseX - dragInfo.current.offsetX) / dayWidth));
+                    updated.row = Math.max(0, Math.min(rowLabels.length - 1, Math.floor(mouseY / ROW_HEIGHT)));
+                }
+                dragInfo.current.task = updated;
+                setDraggingTask(updated);
+            }, [dayWidth, rowLabels.length]);
+
+            const handleMouseUp = useCallback(() => {
+                if (dragInfo.current.task) {
+                    if (dragInfo.current.hasMoved) finalizeMove(dragInfo.current.task);
+                    else setEditingTaskId(dragInfo.current.task.id);
+                }
+                dragInfo.current.task = null;
+                setDraggingTask(null);
+                window.removeEventListener('mousemove', handleMouseMove);
+                window.removeEventListener('mouseup', handleMouseUp);
+            }, [handleMouseMove]);
+
+            const onMouseDown = (e, task) => {
+                if (e.target.closest('.edit-toolbar') || e.target.closest('.delete-confirm-overlay')) return;
+                if (editingTaskId && editingTaskId !== task.id) return;
+                
+                const rect = e.currentTarget.getBoundingClientRect();
+                const isResizeL = e.target.classList.contains('resize-handle-l');
+                const isResizeR = e.target.classList.contains('resize-handle-r');
+                
+                dragInfo.current = {
+                    task: task, startX: e.clientX, startY: e.clientY, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top,
+                    hasMoved: false, mode: isResizeL ? 'resize-l' : (isResizeR ? 'resize-r' : 'move'),
+                    originalStart: task.start, originalDuration: task.duration
+                };
+                window.addEventListener('mousemove', handleMouseMove);
+                window.addEventListener('mouseup', handleMouseUp);
+            };
+
+            const totalDaysCount = 120;
+            const timelineDays = Array.from({ length: totalDaysCount }, (_, i) => i);
+            const projectEndDay = useMemo(() => tasks.length > 0 ? Math.max(...tasks.map(t => t.start + t.duration)) : 0, [tasks]);
+
+            return html`
+                <div class="flex flex-col h-screen overflow-hidden text-slate-800">
+                    <header class="bg-white border-b px-6 py-4 flex items-center justify-between shadow-sm z-50">
+                        <div class="flex items-center gap-3">
+                            <div class="bg-indigo-600 p-2 rounded-lg shadow-inner">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h2a2 2 0 00-2 2"></path></svg>
+                            </div>
+                            <h1 class="text-xl font-bold tracking-tight text-slate-900 font-serif italic">Gantt Believe It!</h1>
+                        </div>
+                        
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center bg-slate-100 rounded-lg p-1 border border-slate-200">
+                                <button onClick=${() => setZoom(Math.max(0.4, zoom - 0.2))} class="px-3 py-1 hover:bg-white rounded-md transition-all text-xs font-bold active:scale-95">Zoom Out</button>
+                                <span class="px-3 text-xs font-black text-indigo-600 w-16 text-center">${Math.round(zoom * 100)}%</span>
+                                <button onClick=${() => setZoom(Math.min(2.5, zoom + 0.2))} class="px-3 py-1 hover:bg-white rounded-md transition-all text-xs font-bold active:scale-95">Zoom In</button>
+                            </div>
+                            <div class="h-8 w-px bg-slate-200 mx-1"></div>
+                            <div class="flex gap-2">
+                                <button onClick=${exportData} class="bg-white border border-slate-200 hover:border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">Export</button>
+                                <button onClick=${() => fileInputRef.current.click()} class="bg-white border border-slate-200 hover:border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">Import</button>
+                                <input type="file" ref=${fileInputRef} style="display: none" accept=".json" onChange=${importData} />
+                                <button onClick=${addTask} class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg text-sm font-bold transition-all shadow-md active:scale-95">+ Add Task</button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div class="flex-1 flex overflow-hidden relative" ref=${containerRef}>
+                        <div class="w-[250px] bg-white border-r flex-shrink-0 z-40 flex flex-col shadow-xl">
+                            <div class="h-12 border-b bg-slate-50 flex items-center px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Swimlanes</div>
+                            <div class="flex-1 overflow-y-auto overflow-x-hidden relative">
+                                <div style="transform: translateY(${-containerScroll.top}px)">
+                                    ${rowLabels.map((label, i) => {
+                                        const laneTasks = tasks.filter(t => t.row === i);
+                                        const hasTasks = laneTasks.length > 0;
+                                        const startDay = hasTasks ? Math.min(...laneTasks.map(t => t.start)) + 1 : 0;
+                                        const endDay = hasTasks ? Math.max(...laneTasks.map(t => t.start + t.duration)) : 0;
+                                        return html`
+                                            <div key=${i} data-row-idx=${i} class="h-[60px] border-b flex flex-col justify-center px-4 group hover:bg-indigo-50/50 transition-colors relative">
+                                                ${editingRowIdx === i 
+                                                    ? html`<div class="flex flex-col w-full">
+                                                        <input autoFocus onFocus=${e => e.target.select()} class="editable-input text-sm font-bold mb-1" value=${label} onInput=${(e) => updateRowLabel(i, e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && setEditingRowIdx(null)} />
+                                                        <button onMouseDown=${(e) => { e.stopPropagation(); setConfirmDeleteRowIdx(i); }} class="text-[9px] text-rose-500 font-bold hover:underline w-fit">🗑️ Delete Lane</button>
+                                                    </div>`
+                                                    : html`<div onClick=${() => setEditingRowIdx(i)} class="flex-1 flex flex-col justify-center cursor-pointer select-none py-1">
+                                                        <span class="text-sm font-bold text-slate-700 truncate">${label}</span>
+                                                        <span class="text-[10px] text-slate-400 font-medium">${hasTasks ? `Days ${startDay}-${endDay}` : 'No tasks scheduled'}</span>
+                                                    </div>`
+                                                }
+                                                ${confirmDeleteRowIdx === i && html`<div class="absolute inset-0 bg-white/95 z-50 flex items-center justify-center gap-2 px-2">
+                                                    <span class="text-[10px] font-bold text-slate-500 uppercase">Delete?</span>
+                                                    <button onMouseDown=${() => {
+                                                        const newLabels = rowLabels.filter((_, idx) => idx !== i);
+                                                        setRowLabels(newLabels);
+                                                        setTasks(tasks.filter(t => t.row !== i).map(t => t.row > i ? { ...t, row: t.row - 1 } : t));
+                                                        setConfirmDeleteRowIdx(null);
+                                                        setEditingRowIdx(null);
+                                                    }} class="bg-rose-600 text-white text-[10px] px-2 py-1 rounded">Yes</button>
+                                                    <button onMouseDown=${() => setConfirmDeleteRowIdx(null)} class="bg-slate-200 text-slate-700 text-[10px] px-2 py-1 rounded">No</button>
+                                                </div>`}
+                                            </div>`;
+                                    })}
+                                    <button onClick=${() => { const l = `New Lane ${rowLabels.length+1}`; setRowLabels([...rowLabels, l]); setEditingRowIdx(rowLabels.length); }} class="w-full h-[60px] flex items-center justify-center text-xs font-bold text-indigo-600 hover:bg-indigo-50 transition-colors gap-2"><span class="text-lg">+</span> Add Swimlane</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex-1 overflow-auto relative bg-white" onScroll=${(e) => setContainerScroll({ left: e.target.scrollLeft, top: e.target.scrollTop })}>
+                            <div class="sticky top-0 z-30 bg-slate-50 border-b shadow-sm">
+                                <div class="flex border-b border-slate-200">
+                                    ${Array.from({ length: Math.ceil(totalDaysCount / 5) }).map((_, i) => html`
+                                        <div key=${i} style="width: ${dayWidth * 5}px" class="flex-shrink-0 border-r border-slate-200 flex items-center justify-center text-[9px] font-black text-indigo-600 uppercase tracking-widest h-5 bg-indigo-50/30">Week ${i + 1}</div>
+                                    `)}
+                                </div>
+                                <div class="flex h-7">${timelineDays.map(day => html`<div key=${day} style="width: ${dayWidth}px" class="flex-shrink-0 border-r border-slate-200 flex flex-col items-center justify-center text-[9px] font-bold text-slate-400"><span>D${day + 1}</span></div>`)}</div>
+                            </div>
+
+                            <div class="gantt-grid relative" style="width: ${totalDaysCount * dayWidth}px; height: ${Math.max(rowLabels.length + 1, 12) * ROW_HEIGHT}px; background-size: ${dayWidth}px ${ROW_HEIGHT}px;">
+                                ${tasks.map(task => {
+                                    const isDragging = draggingTask && draggingTask.id === task.id;
+                                    const isEditing = editingTaskId === task.id;
+                                    const displayTask = isDragging ? draggingTask : task;
+                                    
+                                    return html`
+                                        <div key=${task.id} data-task-id=${task.id} onMouseDown=${(e) => onMouseDown(e, task)}
+                                            class="absolute task-bar group rounded-lg border border-black/10 flex flex-col justify-center px-3 text-white shadow-sm ${isDragging ? 'opacity-30 z-0' : 'z-10 hover:shadow-lg'}"
+                                            style="left: ${displayTask.start * dayWidth + 2}px; top: ${displayTask.row * ROW_HEIGHT + 10}px; width: ${displayTask.duration * dayWidth - 4}px; height: 42px; background-color: ${displayTask.color}; pointer-events: ${isDragging && dragInfo.current.mode === 'move' ? 'none' : 'auto'};">
+                                            
+                                            <div class="resize-handle-l"></div>
+                                            <div class="resize-handle-r"></div>
+
+                                            ${isEditing 
+                                                ? html`
+                                                    <div class="relative w-full h-full flex items-center">
+                                                        <input autoFocus onFocus=${e => e.target.select()} class="editable-input text-xs" value=${task.name} onInput=${(e) => updateTaskName(task.id, e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && setEditingTaskId(null)} />
+                                                    </div>
+                                                    <!-- Edit Toolbar -->
+                                                    <div class="edit-toolbar absolute top-[44px] left-0 w-max min-w-full bg-white border border-slate-200 shadow-xl rounded-lg p-1.5 flex items-center gap-3 z-[60]">
+                                                        <button onMouseDown=${(e) => { e.stopPropagation(); setConfirmDeleteId(task.id); }} class="bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white rounded-md p-1.5 transition-colors" title="Delete Task">
+                                                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+                                                        </button>
+                                                        <div class="h-4 w-px bg-slate-200"></div>
+                                                        <input 
+                                                            type="color" 
+                                                            class="native-color-picker" 
+                                                            value=${task.color} 
+                                                            onInput=${(e) => updateTaskColor(task.id, e.target.value)} 
+                                                            title="Pick Task Color"
+                                                        />
+                                                    </div>
+                                                `
+                                                : html`
+                                                    <div class="task-label-container">
+                                                        <div class="text-xs font-bold leading-tight">${task.name}</div>
+                                                        <div class="text-[9px] font-medium opacity-80 leading-tight">${task.duration} ${task.duration === 1 ? 'Day' : 'Days'}</div>
+                                                    </div>`
+                                            }
+
+                                            ${confirmDeleteId === task.id && html`
+                                                <div class="absolute inset-0 rounded-lg delete-confirm-overlay z-[70] flex items-center justify-around px-1">
+                                                    <button onMouseDown=${(e) => { e.stopPropagation(); setTasks(tasks.filter(t => t.id !== task.id)); setConfirmDeleteId(null); setEditingTaskId(null); }} class="text-[10px] bg-rose-600 text-white px-2 py-1 rounded font-bold">Delete?</button>
+                                                    <button onMouseDown=${(e) => { e.stopPropagation(); setConfirmDeleteId(null); }} class="text-[10px] bg-slate-200 text-slate-700 px-2 py-1 rounded font-bold">No</button>
+                                                </div>`}
+                                        </div>`;
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    <footer class="bg-white border-t px-6 py-2 text-[10px] text-slate-400 flex justify-between uppercase tracking-widest font-bold">
+                        <div class="flex gap-8 items-center">
+                            <span>Tasks: <span class="text-slate-900">${tasks.length}</span></span>
+                            <span>Project Span: <span class="text-slate-900">${projectEndDay} Days</span></span>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span class="text-emerald-500 font-black">● Auto-Saving</span>
+                            <button onClick=${() => setIsHelpOpen(true)} class="bg-slate-800 text-white px-3 py-1 rounded hover:bg-black transition-colors">Help</button>
+                        </div>
+                    </footer>
+
+                    ${isHelpOpen && html`
+                        <div class="fixed inset-0 z-[100] flex items-center justify-center p-6 modal-overlay" onClick=${() => setIsHelpOpen(false)}>
+                            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" onClick=${e => e.stopPropagation()}>
+                                <div class="px-6 py-4 border-b flex justify-between items-center bg-slate-50">
+                                    <h2 class="text-lg font-bold text-slate-900">User Guide & JSON Schema</h2>
+                                    <button onClick=${() => setIsHelpOpen(false)} class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+                                </div>
+                                <div class="p-6 overflow-y-auto space-y-6">
+                                    <section>
+                                        <h3 class="text-indigo-600 font-bold uppercase text-xs tracking-widest mb-2">Instructions</h3>
+                                        <ul class="list-disc list-inside text-sm text-slate-600 space-y-1">
+                                            <li><span class="font-bold">Move:</span> Drag the middle of a task bar.</li>
+                                            <li><span class="font-bold">Resize:</span> Drag the left or right edge of a task bar.</li>
+                                            <li><span class="font-bold">Minimum Size:</span> Tasks cannot be smaller than 1 day.</li>
+                                            <li><span class="font-bold">Collision:</span> Rescheduling pushes subsequent tasks to prevent overlap.</li>
+                                            <li><span class="font-bold">Management:</span> Add swimlanes or tasks, and click items to edit names.</li>
+                                        </ul>
+                                    </section>
+                                    <section>
+                                        <h3 class="text-indigo-600 font-bold uppercase text-xs tracking-widest mb-2">Import/Export JSON Format</h3>
+                                        <pre class="bg-slate-900 text-indigo-300 p-4 rounded-xl text-xs overflow-x-auto leading-relaxed shadow-inner mt-4">
+${JSON.stringify(JSON_SCHEMA, null, 2)}
+                                        </pre>
+                                    </section>
+                                </div>
+                                <div class="px-6 py-4 border-t bg-slate-50 flex justify-end">
+                                    <button onClick=${() => setIsHelpOpen(false)} class="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700 transition-colors">Got it</button>
+                                </div>
+                            </div>
+                        </div>
+                    `}
+                </div>
+            `;
+        };
+
+        render(html`<${App} />`, document.getElementById('app'));
+    </script>
+</body>
+</html>
