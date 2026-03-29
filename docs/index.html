@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gantt Believe It! - Interactive Project Planner</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
         
@@ -230,6 +231,34 @@
                 e.target.value = null;
             };
 
+            const takeSnapshot = () => {
+                const element = document.getElementById('gantt-container');
+                const clone = element.cloneNode(true);
+                clone.style.position = 'absolute';
+                clone.style.top = '-9999px';
+                clone.style.left = '-9999px';
+                clone.style.width = element.scrollWidth + 'px';
+                clone.style.height = element.scrollHeight + 'px';
+                clone.style.overflow = 'visible';
+                document.body.appendChild(clone);
+
+                html2canvas(clone, {
+                    scale: 1,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#ffffff'
+                }).then(canvas => {
+                    document.body.removeChild(clone);
+                    const link = document.createElement('a');
+                    link.download = `gantt-snapshot-${new Date().toISOString().split('T')[0]}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                }).catch(err => {
+                    document.body.removeChild(clone);
+                    console.error('Snapshot failed:', err);
+                });
+            };
+
             const addTask = () => {
                 let currentLabels = [...rowLabels];
                 if (currentLabels.length === 0) {
@@ -385,7 +414,7 @@
             const timelineDays = Array.from({ length: totalDaysCount }, (_, i) => i);
 
             return html`
-                <div class="flex flex-col h-screen overflow-auto text-slate-800">
+                <div id="gantt-container" class="flex flex-col h-screen overflow-auto text-slate-800">
                     <header class="bg-white border-b px-6 py-4 flex items-center justify-between shadow-sm" style="position: sticky; top: 0; left: 0; z-index: 50;">
                         <div class="flex items-center gap-3">
                             <div class="bg-indigo-600 p-2 rounded-lg shadow-inner">
@@ -405,6 +434,7 @@
                                 <button onClick=${exportData} class="bg-white border border-slate-200 hover:border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">Export</button>
                                 <button onClick=${() => fileInputRef.current.click()} class="bg-white border border-slate-200 hover:border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">Import</button>
                                 <input type="file" ref=${fileInputRef} style="display: none" accept=".json" onChange=${importData} />
+                                <button onClick=${takeSnapshot} class="bg-white border border-slate-200 hover:border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">Snapshot</button>
                                 <button onClick=${addTask} class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg text-sm font-bold transition-all shadow-md active:scale-95">+ Add Task</button>
                             </div>
                         </div>
