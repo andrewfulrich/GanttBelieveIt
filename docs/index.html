@@ -510,9 +510,14 @@
                                                     </div>
                                                 `
                                                 : html`
-                                                    <div class="task-label-container" style=${shouldRotate ? 'transform: rotate(-30deg) translateX(0); transform-origin: left center; z-index: 1000;' : ''}>
+                                                    <div class="task-label-container">
+                                                        <div class="text-[12px] font-medium opacity-80 leading-tight" style=${shouldRotate ? 'transform: rotate(-30deg) translateX(0); transform-origin: left center; z-index: 1000;' : ''}>
+                                                            ID: ${task.id}
+                                                        </div>
                                                         <div class="text-sm font-bold leading-tight">${task.name}</div>
-                                                        <div class="text-[12px] font-medium opacity-80 leading-tight">ID: ${task.id}, Days: ${task.duration}</div>
+                                                        <div class="text-[12px] font-medium opacity-80 leading-tight">
+                                                            ${task.duration} Days
+                                                        </div>
                                                     </div>`
                                             }
 
