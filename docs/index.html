@@ -291,8 +291,8 @@
                         // Not dropped over a task: find where to insert by start
                         insertAt = rowTasks.findIndex(t => movedTask.start < t.start);
                         if (insertAt === -1) {
-                            // Dropped after all tasks
-                            newStart = rowTasks.length > 0 ? rowTasks[rowTasks.length - 1].start + rowTasks[rowTasks.length - 1].duration : movedTask.start;
+                            // Dropped after all tasks: use the drop position
+                            newStart = movedTask.start;
                             insertAt = rowTasks.length;
                         } else {
                             // Dropped before the first task that starts after movedTask
