@@ -145,6 +145,7 @@
         const initialTasks = [
             { id: '1', name: 'Planning Phase', start: 2, duration: 5, row: 0, color: '#6366f1' },
             { id: '2', name: 'Design Concepts', start: 8, duration: 4, row: 1, color: '#10b981' },
+            { id: '3', name: 'Testing Phase', start: 10, duration: 3, row: 0, color: '#f59e0b' },
         ];
 
         const initialRowLabels = ["Strategic Planning", "UX Design"];
@@ -173,6 +174,9 @@
             const [confirmDeleteRowIdx, setConfirmDeleteRowIdx] = useState(null);
             const [isHelpOpen, setIsHelpOpen] = useState(false);
             const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+            const [swimlaneMenuOpen, setSwimlaneMenuOpen] = useState(null);
+            const [swimlaneInfoOpen, setSwimlaneInfoOpen] = useState(null);
+            const [confirmRemoveGaps, setConfirmRemoveGaps] = useState(null);
             
             const dayWidth = DAY_WIDTH_BASE * zoom;
             const containerRef = useRef(null);
@@ -208,10 +212,12 @@
                             setConfirmDeleteRowIdx(null);
                         }
                     }
+                    const isSwimlaneMenu = e.target.closest('.swimlane-menu');
+                    if (swimlaneMenuOpen !== null && !isSwimlaneMenu) setSwimlaneMenuOpen(null);
                 };
                 window.addEventListener('mousedown', handleClickOutside);
                 return () => window.removeEventListener('mousedown', handleClickOutside);
-            }, [editingTaskId, editingRowIdx]);
+            }, [editingTaskId, editingRowIdx, swimlaneMenuOpen, swimlaneInfoOpen, confirmRemoveGaps]);
 
             const exportData = () => {
                 const data = JSON.stringify({ tasks, rowLabels }, null, 2);
@@ -483,14 +489,17 @@
                                         const endDay = hasTasks ? Math.max(...laneTasks.map(t => t.start + t.duration)) : 0;
                                         return html`
                                             <div key=${i} data-row-idx=${i} class="h-[60px] border-b flex flex-col justify-center px-4 group hover:bg-indigo-50/50 transition-colors relative">
-                                                ${editingRowIdx === i 
+                                                ${editingRowIdx === i
                                                     ? html`<div class="flex flex-col w-full">
                                                         <input autoFocus onFocus=${e => e.target.select()} class="editable-input text-sm font-bold mb-1" value=${label} onInput=${(e) => updateRowLabel(i, e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && setEditingRowIdx(null)} />
                                                         <button onMouseDown=${(e) => { e.stopPropagation(); setConfirmDeleteRowIdx(i); }} class="text-[9px] text-rose-500 font-bold hover:underline w-fit">🗑️ Delete Lane</button>
                                                     </div>`
-                                                    : html`<div onClick=${() => setEditingRowIdx(i)} class="flex-1 flex flex-col justify-center cursor-pointer select-none py-1">
-                                                        <span class="text-sm font-bold text-slate-700 truncate">${label}</span>
-                                                        <span class="text-[12px] text-slate-400 font-medium">${hasTasks ? `Days ${startDay}-${endDay}` : 'No tasks scheduled'}</span>
+                                                    : html`<div class="flex-1 flex items-center justify-between cursor-pointer select-none py-1">
+                                                        <div onClick=${() => setEditingRowIdx(i)} class="flex flex-col">
+                                                            <span class="text-sm font-bold text-slate-700 truncate">${label}</span>
+                                                            <span class="text-[12px] text-slate-400 font-medium">${hasTasks ? `Days ${startDay}-${endDay}` : 'No tasks scheduled'}</span>
+                                                        </div>
+                                                        <button onClick=${(e) => { e.stopPropagation(); setSwimlaneMenuOpen(i); }} class="font-bold text-slate-400 hover:text-slate-600 p-1 rounded">...</button>
                                                     </div>`
                                                 }
                                                 ${confirmDeleteRowIdx === i && html`<div class="absolute inset-0 bg-white/95 z-50 flex items-center justify-center gap-2 px-2">
@@ -503,6 +512,10 @@
                                                         setEditingRowIdx(null);
                                                     }} class="bg-rose-600 text-white text-[12px] px-2 py-1 rounded">Yes</button>
                                                     <button onMouseDown=${() => setConfirmDeleteRowIdx(null)} class="bg-slate-200 text-slate-700 text-[12px] px-2 py-1 rounded">No</button>
+                                                </div>`}
+                                                ${swimlaneMenuOpen === i && html`<div class="swimlane-menu absolute right-2 top-2 bg-white border shadow rounded p-1 z-10">
+                                                    <button onClick=${() => { setSwimlaneMenuOpen(null); setSwimlaneInfoOpen(i); }} class="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100">Info</button>
+                                                    <button onClick=${() => { setSwimlaneMenuOpen(null); setConfirmRemoveGaps(i); }} class="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100">Remove Gaps in Timeline</button>
                                                 </div>`}
                                             </div>`;
                                     })}
@@ -605,11 +618,11 @@
                     </footer>
 
                     ${isHelpOpen && html`
-                        <div class="fixed inset-0 z-[100] flex items-center justify-center p-6 modal-overlay" onClick=${() => setIsHelpOpen(false)}>
+                        <div class="fixed inset-0 z-[1100] flex items-center justify-center p-6 modal-overlay" onClick=${() => setIsHelpOpen(false)}>
                             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" onClick=${e => e.stopPropagation()}>
                                 <div class="px-6 py-4 border-b flex justify-between items-center bg-slate-50">
                                     <h2 class="text-lg font-bold text-slate-900">User Guide & JSON Schema</h2>
-                                    <button onClick=${() => setIsHelpOpen(false)} class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+                                    <button onClick=${() => setIsHelpOpen(false)} class="text-slate-400 hover:text-slate-600 text-2xl leading-none">✖</button>
                                 </div>
                                 <div class="p-6 overflow-y-auto space-y-6">
                                     <section>
@@ -632,6 +645,88 @@ ${JSON.stringify(JSON_SCHEMA, null, 2)}
                                 </div>
                                 <div class="px-6 py-4 border-t bg-slate-50 flex justify-end">
                                     <button onClick=${() => setIsHelpOpen(false)} class="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700 transition-colors">Got it</button>
+                                </div>
+                            </div>
+                        </div>
+                    `}
+
+                    ${swimlaneInfoOpen !== null && (() => {
+                        const laneTasks = tasks.filter(t => t.row === swimlaneInfoOpen).sort((a,b)=>a.start-b.start);
+                        const totalStories = laneTasks.length;
+                        const startDay = totalStories > 0 ? Math.min(...laneTasks.map(t => t.start)) + 1 : 0;
+                        const endDay = totalStories > 0 ? Math.max(...laneTasks.map(t => t.start + t.duration)) : 0;
+                        const occupiedDays = new Set();
+                        laneTasks.forEach(t => {
+                            for(let d=t.start; d<t.start+t.duration; d++) occupiedDays.add(d);
+                        });
+                        const emptyRanges = [];
+                        let inGap = false;
+                        let gapStart = null;
+                        for(let d=0; d<endDay; d++){
+                            if(!occupiedDays.has(d)){
+                                if(!inGap){ gapStart = d; inGap=true; }
+                            }else{
+                                if(inGap){
+                                    emptyRanges.push(`${gapStart+1}-${d}`);
+                                    inGap=false;
+                                }
+                            }
+                        }
+                        if(inGap) emptyRanges.push(`${gapStart+1}-${endDay}`);
+                        return html`
+                            <div class="fixed inset-0 z-[1100] flex items-center justify-center p-6 modal-overlay" onClick=${() => setSwimlaneInfoOpen(null)}>
+                                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col" onClick=${e => e.stopPropagation()}>
+                                    <div class="px-6 py-4 border-b flex justify-between items-center bg-slate-50">
+                                        <h2 class="text-lg font-bold text-slate-900">Swimlane Info</h2>
+                                        <button onClick=${() => setSwimlaneInfoOpen(null)} class="text-slate-400 hover:text-slate-600 text-2xl leading-none">✖</button>
+                                    </div>
+                                    <div class="p-6 space-y-4">
+                                        <div><strong>Swimlane:</strong> ${rowLabels[swimlaneInfoOpen]}</div>
+                                        <div><strong>Total Stories:</strong> ${totalStories}</div>
+                                        <div><strong>Start Day:</strong> D${startDay}</div>
+                                        <div><strong>End Day:</strong> D${endDay}</div>
+                                        <div><strong>Empty Day Ranges:</strong> ${emptyRanges.length > 0 ? emptyRanges.join(', ') : 'None'}</div>
+                                    </div>
+                                    <div class="px-6 py-4 border-t bg-slate-50 flex justify-end">
+                                        <button onClick=${() => setSwimlaneInfoOpen(null)} class="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700 transition-colors">Close</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    })()}
+
+                    ${confirmRemoveGaps !== null && html`
+                        <div class="fixed inset-0 z-[1100] flex items-center justify-center p-6 modal-overlay" onClick=${() => setConfirmRemoveGaps(null)}>
+                            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col" onClick=${e => e.stopPropagation()}>
+                                <div class="px-6 py-4 border-b flex justify-between items-center bg-slate-50">
+                                    <h2 class="text-lg font-bold text-slate-900">Confirm Action</h2>
+                                    <button onClick=${() => setConfirmRemoveGaps(null)} class="text-slate-400 hover:text-slate-600 text-2xl leading-none">✖</button>
+                                </div>
+                                <div class="p-6">
+                                    <p class="text-sm text-slate-600">This action will move stories up in the timeline to eliminate any 'gap days', or days that have no tasks. This will affect the entire swimlane. Are you sure you want to do this?</p>
+                                </div>
+                                <div class="px-6 py-4 border-t bg-slate-50 flex justify-end gap-2">
+                                    <button onClick=${() => setConfirmRemoveGaps(null)} class="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold">Cancel</button>
+                                    <button onClick=${() => {
+                                        setTasks(prevTasks => {
+                                            console.log('what')
+                                            const laneTasks = prevTasks.filter(t => t.row === confirmRemoveGaps).sort((a,b)=>a.start-b.start);
+                                            if(laneTasks.length <=1) return prevTasks;
+                                            let prevEnd = laneTasks[0].start + laneTasks[0].duration;
+                                            console.log('laneTasks', laneTasks)
+                                            console.log('prevEnd',prevEnd)
+                                            console.log('prevTasks',prevTasks)
+                                            return prevTasks.map(t => {
+                                                if(t.row !== confirmRemoveGaps) return t;
+                                                const index = laneTasks.findIndex(lt => lt.id === t.id);
+                                                if(index === 0) return t;
+                                                const newStart = prevEnd;
+                                                prevEnd = newStart + t.duration;
+                                                return { ...t, start: newStart };
+                                            });
+                                        });
+                                        setConfirmRemoveGaps(null);
+                                    }} class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700">Yes, Remove Gaps</button>
                                 </div>
                             </div>
                         </div>
