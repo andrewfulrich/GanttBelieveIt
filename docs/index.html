@@ -31,6 +31,7 @@
             width: 8px;
             cursor: ew-resize;
             z-index: 20;
+            background: rgba(0,0,0,0.1);
         }
         .resize-handle-l { left: 0; }
         .resize-handle-r { right: 0; }
@@ -161,12 +162,17 @@
             const [zoom, setZoom] = useState(1);
             const [draggingTask, setDraggingTask] = useState(null);
             const [containerScroll, setContainerScroll] = useState({ left: 0, top: 0 });
-            
+            const [sidebarWidth, setSidebarWidth] = useState(() => {
+                const saved = localStorage.getItem('gantt-sidebar-width');
+                return saved ? parseInt(saved, 10) : 250;
+            });
+
             const [editingTaskId, setEditingTaskId] = useState(null);
             const [editingRowIdx, setEditingRowIdx] = useState(null);
             const [confirmDeleteId, setConfirmDeleteId] = useState(null);
             const [confirmDeleteRowIdx, setConfirmDeleteRowIdx] = useState(null);
             const [isHelpOpen, setIsHelpOpen] = useState(false);
+            const [isResizingSidebar, setIsResizingSidebar] = useState(false);
             
             const dayWidth = DAY_WIDTH_BASE * zoom;
             const containerRef = useRef(null);
@@ -180,6 +186,10 @@
             useEffect(() => {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, rowLabels }));
             }, [tasks, rowLabels]);
+
+            useEffect(() => {
+                localStorage.setItem('gantt-sidebar-width', sidebarWidth.toString());
+            }, [sidebarWidth]);
 
             useEffect(() => {
                 const handleClickOutside = (e) => {
@@ -299,6 +309,23 @@
                 setRowLabels(newLabels);
             };
 
+            const startSidebarResize = (e) => {
+                setIsResizingSidebar(true);
+                document.body.style.userSelect = 'none';
+                const handleResize = (e) => {
+                    const newWidth = Math.max(150, Math.min(600, e.clientX));
+                    setSidebarWidth(newWidth);
+                };
+                const stopResize = () => {
+                    setIsResizingSidebar(false);
+                    document.body.style.userSelect = '';
+                    window.removeEventListener('mousemove', handleResize);
+                    window.removeEventListener('mouseup', stopResize);
+                };
+                window.addEventListener('mousemove', handleResize);
+                window.addEventListener('mouseup', stopResize);
+            };
+
             const finalizeMove = (movedTask) => {
                 setTasks(prevTasks => {
                     let otherTasks = prevTasks.filter(t => t.id !== movedTask.id);
@@ -361,7 +388,7 @@
                 if (!dragInfo.current.hasMoved) return;
 
                 const containerRect = containerRef.current.getBoundingClientRect();
-                const mouseX = e.clientX - containerRect.left - 250 + containerRef.current.scrollLeft;
+                const mouseX = e.clientX - containerRect.left - sidebarWidth + containerRef.current.scrollLeft;
                 const mouseY = e.clientY - containerRect.top - 48 + containerRef.current.scrollTop;
                 const currentDay = Math.floor(mouseX / dayWidth);
 
@@ -379,7 +406,7 @@
                 }
                 dragInfo.current.task = updated;
                 setDraggingTask(updated);
-            }, [dayWidth, rowLabels.length]);
+            }, [dayWidth, rowLabels.length, sidebarWidth]);
 
             const handleMouseUp = useCallback(() => {
                 if (dragInfo.current.task) {
@@ -395,11 +422,14 @@
             const onMouseDown = (e, task) => {
                 if (e.target.closest('.edit-toolbar') || e.target.closest('.delete-confirm-overlay')) return;
                 if (editingTaskId && editingTaskId !== task.id) return;
-                
+
                 const rect = e.currentTarget.getBoundingClientRect();
-                const isResizeL = e.target.classList.contains('resize-handle-l');
-                const isResizeR = e.target.classList.contains('resize-handle-r');
-                
+                const clickX = e.clientX - rect.left;
+                const isNearLeft = clickX < 10;
+                const isNearRight = clickX > rect.width - 10;
+                const isResizeL = isNearLeft || e.target.classList.contains('resize-handle-l');
+                const isResizeR = isNearRight || e.target.classList.contains('resize-handle-r');
+
                 dragInfo.current = {
                     task: task, startX: e.clientX, startY: e.clientY, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top,
                     hasMoved: false, mode: isResizeL ? 'resize-l' : (isResizeR ? 'resize-r' : 'move'),
@@ -441,9 +471,10 @@
                     </header>
 
                     <div class="flex-1 flex overflow-visible relative" ref=${containerRef}>
-                        <div class="w-[250px] bg-white border-r flex-shrink-0 flex flex-col shadow-xl" style="position: sticky; left: 0; z-index: 1001">
+                        <div class="bg-white border-r flex-shrink-0 flex flex-col shadow-xl relative" style="position: sticky; left: 0; z-index: 1001; width: ${sidebarWidth}px;">
                             <div class="h-12 border-b bg-slate-50 flex items-center px-4 text-[12px] font-black text-slate-400 uppercase tracking-widest">Swimlanes</div>
                             <div class="flex-1 overflow-y-auto overflow-x-hidden relative">
+                                <div onMouseDown=${startSidebarResize} class="absolute right-0 top-0 bottom-0 w-4 bg-gray-100 cursor-ew-resize z-10"></div>
                                 <div style="transform: translateY(${-containerScroll.top}px)">
                                     ${rowLabels.map((label, i) => {
                                         const laneTasks = tasks.filter(t => t.row === i);
