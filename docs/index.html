@@ -452,6 +452,17 @@
             const totalDaysCount = Math.max(90, projectEndDay);
             const timelineDays = Array.from({ length: totalDaysCount }, (_, i) => i);
 
+            const getDayTooltip = (day) => {
+                let tooltip = `Day ${day + 1}`;
+                rowLabels.forEach((label, rowIndex) => {
+                    const tasksOnDay = tasks.filter(t => t.row === rowIndex && t.start <= day && t.start + t.duration > day);
+                    if (tasksOnDay.length > 0) {
+                        tooltip += `\n${label}: ${tasksOnDay.map(t => t.name).join(', ')}`;
+                    }
+                });
+                return tooltip;
+            };
+
             return html`
                 <div id="gantt-container" class="flex flex-col h-screen overflow-auto text-slate-800">
                     <header class="bg-white border-b px-6 py-4 flex items-center justify-between shadow-sm" style="position: sticky; top: 0; left: 0; z-index: 50;">
@@ -535,7 +546,7 @@
                                         <div key=${i} style="width: ${dayWidth * 5}px" class="flex-shrink-0 border-r border-slate-200 flex items-center justify-center text-[9px] font-black text-indigo-600 uppercase tracking-widest h-5 bg-indigo-50/30">Week ${i + 1}</div>
                                     `)}
                                 </div>
-                                <div class="flex h-7">${timelineDays.map(day => html`<div key=${day} style="width: ${dayWidth}px" class="flex-shrink-0 border-r border-slate-200 flex flex-col items-center justify-center text-[9px] font-bold text-slate-400"><span>D${day + 1}</span></div>`)}</div>
+                                <div class="flex h-7">${timelineDays.map(day => html`<div key=${day} style="width: ${dayWidth}px" class="flex-shrink-0 border-r border-slate-200 flex flex-col items-center justify-center text-[9px] font-bold text-slate-400" title=${getDayTooltip(day)}><span>${day + 1}</span></div>`)}</div>
                             </div>
 
                             <div class="gantt-grid relative" style="width: ${totalDaysCount * dayWidth}px; height: ${Math.max(rowLabels.length + 1, 12) * ROW_HEIGHT}px; background-size: ${dayWidth}px ${ROW_HEIGHT}px;">
