@@ -275,28 +275,51 @@
                     let otherTasks = prevTasks.filter(t => t.id !== movedTask.id);
                     let rowTasks = otherTasks.filter(t => t.row === movedTask.row).sort((a, b) => a.start - b.start);
 
-                    let finalStart = movedTask.start;
-                    if (dragInfo.current.mode === 'move') {
-                        for (let i = 0; i < rowTasks.length; i++) {
-                            const current = rowTasks[i];
-                            if (finalStart >= current.start && finalStart < (current.start + current.duration)) {
-                                finalStart = current.start + current.duration;
-                            }
+
+                    // Find the drop target (task B) - the task under the drop
+                    let targetIdx = rowTasks.findIndex(t =>
+                        movedTask.start >= t.start && movedTask.start < t.start + t.duration
+                    );
+                    let newStart;
+                    let insertAt;
+                    if (targetIdx !== -1) {
+                        // Dropped over a task: insert after it
+                        const target = rowTasks[targetIdx];
+                        newStart = target.start + target.duration;
+                        insertAt = targetIdx + 1;
+                    } else {
+                        // Not dropped over a task: find where to insert by start
+                        insertAt = rowTasks.findIndex(t => movedTask.start < t.start);
+                        if (insertAt === -1) {
+                            // Dropped after all tasks
+                            newStart = rowTasks.length > 0 ? rowTasks[rowTasks.length - 1].start + rowTasks[rowTasks.length - 1].duration : movedTask.start;
+                            insertAt = rowTasks.length;
+                        } else {
+                            // Dropped before the first task that starts after movedTask
+                            newStart = movedTask.start;
                         }
                     }
 
-                    const updatedMovedTask = { ...movedTask, start: finalStart };
-                    let newTaskList = [...otherTasks, updatedMovedTask];
-                    newTaskList.sort((a, b) => (a.row !== b.row) ? a.row - b.row : a.start - b.start);
-                    
-                    for (let r = 0; r < rowLabels.length; r++) {
-                        let rTasks = newTaskList.filter(t => t.row === r);
-                        for (let i = 1; i < rTasks.length; i++) {
-                            if (rTasks[i].start < rTasks[i-1].start + rTasks[i-1].duration) {
-                                rTasks[i].start = rTasks[i-1].start + rTasks[i-1].duration;
-                            }
+                    // Insert movedTask at the correct place
+                    const updatedMovedTask = { ...movedTask, start: newStart };
+                    let newRowTasks = [...rowTasks];
+                    newRowTasks.splice(insertAt, 0, updatedMovedTask);
+
+                    // Now push all tasks in the row to the right as needed (no overlaps)
+                    for (let i = 1; i < newRowTasks.length; i++) {
+                        const prev = newRowTasks[i - 1];
+                        if (newRowTasks[i].start < prev.start + prev.duration) {
+                            newRowTasks[i].start = prev.start + prev.duration;
                         }
                     }
+
+                    // Merge back with otherTasks (not in this row)
+                    let newTaskList = [
+                        ...otherTasks.filter(t => t.row !== movedTask.row),
+                        ...newRowTasks
+                    ];
+                    // Sort for display
+                    newTaskList.sort((a, b) => (a.row !== b.row) ? a.row - b.row : a.start - b.start);
                     return [...newTaskList];
                 });
             };
