@@ -313,6 +313,37 @@
                 sidebarClone.style.top = '0';
                 sidebarClone.style.height = (48 + rowLabels.length * 60) + 'px';
                 sidebarClone.style.zIndex = '1';
+                // Reset the scroll transform to prevent overlap
+                const swimlaneContainer = sidebarClone.querySelector('.swimlane-container');
+                if (swimlaneContainer && swimlaneContainer.parentElement) {
+                    swimlaneContainer.parentElement.style.transform = 'translateY(0)';
+                }
+                // Adjust swimlane container to position label higher
+                const containers = sidebarClone.querySelectorAll('.swimlane-container');
+                containers.forEach(container => {
+                    container.style.justifyContent = 'flex-start';
+                    container.style.paddingTop = '8px';
+                    container.style.backgroundColor="white";
+                    container.style.position = 'relative';
+                });
+                const inners=sidebarClone.querySelectorAll('.swimlane-inner');
+                inners.forEach(inner=>{
+                    inner.style.backgroundColor='none';
+                    inner.style.padding=0;
+                })
+
+                const sbuttons = sidebarClone.querySelectorAll('.swimlane-button');
+                sbuttons.forEach(b => {
+                    b.style.display='none';
+                })
+                const labels = sidebarClone.querySelectorAll('.swimlane-label');
+                labels.forEach(l=>{
+                    l.style.position='absolute';
+                    l.style.top=0;
+                    l.style.zIndex=2000;
+                    l.style.overflow='visible';
+                })
+
                 snapshotContainer.appendChild(sidebarClone);
 
                 // Clone and position timeline
@@ -668,15 +699,15 @@
                                                         <input autoFocus onFocus=${e => e.target.select()} class="editable-input text-sm font-bold mb-1" value=${label} onInput=${(e) => updateRowLabel(i, e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && setEditingRowIdx(null)} />
                                                         <button onMouseDown=${(e) => { e.stopPropagation(); setConfirmDeleteRowIdx(i); }} class="text-[9px] text-rose-500 font-bold hover:underline w-fit">🗑️ Delete Lane</button>
                                                     </div>`
-                                                    : html`<div class="flex-1 flex items-center justify-between cursor-pointer select-none py-1">
-                                                        <div onClick=${() => setEditingRowIdx(i)} class="flex flex-col">
-                                                            <span class="text-sm font-bold text-slate-700 truncate">${label}</span>
-                                                            <span class="text-[12px] text-slate-400 font-medium">${hasTasks ? `Days ${startDay}-${endDay}` : 'No tasks scheduled'}</span>
+                                                    : html`<div class="swimlane-container flex-1 flex items-center justify-between cursor-pointer select-none py-1">
+                                                        <div onClick=${() => setEditingRowIdx(i)} class="swimlane-inner flex flex-col">
+                                                            <span class="swimlane-label text-sm font-bold text-slate-700 truncate">${label}</span>
+                                                            <span class="swimlane-days text-[12px] text-slate-400 font-medium bg-none">${hasTasks ? `Days ${startDay}-${endDay}` : 'No tasks scheduled'}</span>
                                                         </div>
-                                                        <button onClick=${(e) => { e.stopPropagation(); setSwimlaneMenuOpen(i); }} class="font-bold text-slate-400 hover:text-slate-600 p-1 rounded">...</button>
+                                                        <button onClick=${(e) => { e.stopPropagation(); setSwimlaneMenuOpen(i); }} class="swimlane-button font-bold text-slate-400 hover:text-slate-600 p-1 rounded">...</button>
                                                     </div>`
                                                 }
-                                                ${confirmDeleteRowIdx === i && html`<div class="absolute inset-0 bg-white/95 z-50 flex items-center justify-center gap-2 px-2">
+                                                ${confirmDeleteRowIdx === i && html`<div class="swimlane-confirm absolute inset-0 bg-white/95 z-50 flex items-center justify-center gap-2 px-2">
                                                     <span class="text-[12px] font-bold text-slate-500 uppercase">Delete?</span>
                                                     <button onMouseDown=${() => {
                                                         const newLabels = rowLabels.filter((_, idx) => idx !== i);
