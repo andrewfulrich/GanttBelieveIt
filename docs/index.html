@@ -295,29 +295,62 @@
             };
 
             const takeSnapshot = () => {
-                const element = document.getElementById('gantt-container');
-                const clone = element.cloneNode(true);
-                clone.style.position = 'absolute';
-                clone.style.top = '-9999px';
-                clone.style.left = '-9999px';
-                clone.style.width = element.scrollWidth + 'px';
-                clone.style.height = element.scrollHeight + 'px';
-                clone.style.overflow = 'visible';
-                document.body.appendChild(clone);
+                // Create a new container for the snapshot
+                const snapshotContainer = document.createElement('div');
+                snapshotContainer.style.position = 'absolute';
+                snapshotContainer.style.top = '-9999px';
+                snapshotContainer.style.left = '-9999px';
+                snapshotContainer.style.width = (sidebarWidth + totalDaysCount * dayWidth) + 'px';
+                snapshotContainer.style.height = (48 + rowLabels.length * 60) + 'px';
+                snapshotContainer.style.overflow = 'visible';
+                snapshotContainer.style.backgroundColor = '#ffffff';
 
-                html2canvas(clone, {
+                // Clone and position sidebar
+                const sidebar = document.querySelector('.bg-white.border-r');
+                const sidebarClone = sidebar.cloneNode(true);
+                sidebarClone.style.position = 'absolute';
+                sidebarClone.style.left = '0';
+                sidebarClone.style.top = '0';
+                sidebarClone.style.height = (48 + rowLabels.length * 60) + 'px';
+                sidebarClone.style.zIndex = '1';
+                snapshotContainer.appendChild(sidebarClone);
+
+                // Clone and position timeline
+                const timeline = document.querySelector('.sticky.top-0.bg-slate-50.border-b');
+                const timelineClone = timeline.cloneNode(true);
+                timelineClone.style.position = 'absolute';
+                timelineClone.style.left = sidebarWidth + 'px';
+                timelineClone.style.top = '0';
+                timelineClone.style.width = (totalDaysCount * dayWidth) + 'px';
+                snapshotContainer.appendChild(timelineClone);
+
+                // Clone and position grid
+                const ganttGrid = document.querySelector('.gantt-grid');
+                const gridClone = ganttGrid.cloneNode(true);
+                gridClone.style.position = 'absolute';
+                gridClone.style.left = sidebarWidth + 'px';
+                gridClone.style.top = '48px';
+                gridClone.style.width = (totalDaysCount * dayWidth) + 'px';
+                gridClone.style.height = `${rowLabels.length * 60}px`;
+                snapshotContainer.appendChild(gridClone);
+
+                document.body.appendChild(snapshotContainer);
+
+                html2canvas(snapshotContainer, {
                     scale: 1,
                     useCORS: true,
                     allowTaint: true,
-                    backgroundColor: '#ffffff'
+                    backgroundColor: '#ffffff',
+                    width: sidebarWidth + totalDaysCount * dayWidth,
+                    height: 48 + rowLabels.length * 60
                 }).then(canvas => {
-                    document.body.removeChild(clone);
+                    document.body.removeChild(snapshotContainer);
                     const link = document.createElement('a');
                     link.download = `gantt-snapshot-${new Date().toISOString().split('T')[0]}.png`;
                     link.href = canvas.toDataURL('image/png');
                     link.click();
                 }).catch(err => {
-                    document.body.removeChild(clone);
+                    document.body.removeChild(snapshotContainer);
                     console.error('Snapshot failed:', err);
                 });
             };
