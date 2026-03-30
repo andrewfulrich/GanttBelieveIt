@@ -416,6 +416,16 @@
                 setTasks(tasks.map(t => t.id === id ? { ...t, name } : t));
             };
 
+            const updateTaskId = (oldId, newId) => {
+                if (newId.trim() === '') return; // Don't allow empty IDs
+                if (tasks.some(t => t.id === newId && t.id !== oldId)) {
+                    alert('Task ID must be unique. Please choose a different ID.');
+                    return;
+                }
+                setTasks(tasks.map(t => t.id === oldId ? { ...t, id: newId } : t));
+                setEditingTaskId(newId); // Update the editing state to the new ID
+            };
+
             const updateTaskEpic = (id, epic) => {
                 setTasks(tasks.map(t => t.id === id ? { ...t, epic } : t));
             };
@@ -771,10 +781,11 @@
                                             <div class="resize-handle-l"></div>
                                             <div class="resize-handle-r"></div>
 
-                                            ${isEditing 
+                                            ${isEditing
                                                 ? html`
-                                                    <div class="relative w-full h-full flex items-center">
-                                                        <input autoFocus onFocus=${e => e.target.select()} class="editable-input text-xs" value=${task.name} onInput=${(e) => updateTaskName(task.id, e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && setEditingTaskId(null)} />
+                                                    <div class="relative w-full h-full flex flex-col items-center justify-center gap-1">
+                                                        <input autoFocus onFocus=${e => e.target.select()} class="editable-input text-xs" value=${task.id} onInput=${(e) => updateTaskId(task.id, e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && setEditingTaskId(null)} placeholder="Task ID" />
+                                                        <input onFocus=${e => e.target.select()} class="editable-input text-xs" value=${task.name} onInput=${(e) => updateTaskName(task.id, e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && setEditingTaskId(null)} placeholder="Task Name" />
                                                     </div>
                                                     <!-- Edit Toolbar -->
                                                     <div class="edit-toolbar absolute top-[44px] left-0 w-max min-w-full bg-white border border-slate-200 shadow-xl rounded-lg p-1.5 flex items-center gap-3 z-[60]">
