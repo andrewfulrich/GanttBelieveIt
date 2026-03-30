@@ -176,7 +176,7 @@
 
         const initialRowLabels = ["Strategic Planning", "UX Design"];
 
-        const initialSettings = { showTitles: true, projectStartDate: '' };
+        const initialSettings = { showTitles: true, projectStartDate: '2026-01-01' };
 
         const App = () => {
             const [tasks, setTasks] = useState(() => {
@@ -639,8 +639,6 @@
             };
 
             const projectEndDay = useMemo(() => tasks.length > 0 ? Math.max(...tasks.map(t => t.start + t.duration)) : 0, [tasks]);
-            const totalDaysCount = Math.max(90, projectEndDay);
-            const timelineDays = Array.from({ length: totalDaysCount }, (_, i) => i);
 
             const countBusinessDays = (startDate, endDate) => {
                 let count = 0;
@@ -655,17 +653,57 @@
                 return count;
             };
 
+            const getBusinessDays = (startDate, count) => {
+                const dates = [];
+                let current = new Date(startDate);
+                while (dates.length < count) {
+                    const dayOfWeek = current.getDay();
+                    if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sunday (0) or Saturday (6)
+                        dates.push(new Date(current));
+                    }
+                    current.setDate(current.getDate() + 1);
+                }
+                return dates;
+            };
+
+            const startDate = useMemo(() => new Date(settings.projectStartDate || '2026-01-01'), [settings.projectStartDate]);
+            const businessDays = useMemo(() => getBusinessDays(startDate, Math.max(90, projectEndDay)), [startDate, projectEndDay]);
+            const totalDaysCount = businessDays.length;
+
+            const monthGroups = useMemo(() => {
+                const groups = [];
+                let currentMonth = null;
+                let count = 0;
+                businessDays.forEach((date, i) => {
+                    const month = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                    if (month !== currentMonth) {
+                        if (currentMonth) {
+                            groups.push({ month: currentMonth, days: count });
+                        }
+                        currentMonth = month;
+                        count = 1;
+                    } else {
+                        count++;
+                    }
+                });
+                if (currentMonth) {
+                    groups.push({ month: currentMonth, days: count });
+                }
+                return groups;
+            }, [businessDays]);
+
             const currentDay = useMemo(() => {
                 if (!settings.projectStartDate) return -1;
-                const startDate = new Date(settings.projectStartDate);
                 const today = new Date();
                 const endDate = new Date(today);
                 endDate.setDate(endDate.getDate() + 1);
                 return countBusinessDays(startDate, endDate);
-            }, [settings.projectStartDate]);
+            }, [startDate]);
 
             const getDayTooltip = (day) => {
-                let tooltip = `Day ${day + 1}`;
+                const date = businessDays[day];
+                const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                let tooltip = `${formatted}`;
                 rowLabels.forEach((label, rowIndex) => {
                     const tasksOnDay = tasks.filter(t => t.row === rowIndex && t.start <= day && t.start + t.duration > day);
                     if (tasksOnDay.length > 0) {
@@ -740,8 +778,8 @@
                                     ${rowLabels.map((label, i) => {
                                         const laneTasks = tasks.filter(t => t.row === i);
                                         const hasTasks = laneTasks.length > 0;
-                                        const startDay = hasTasks ? Math.min(...laneTasks.map(t => t.start)) + 1 : 0;
-                                        const endDay = hasTasks ? Math.max(...laneTasks.map(t => t.start + t.duration)) : 0;
+                                        const taskStartDate = hasTasks ? businessDays[Math.min(...laneTasks.map(t => t.start))] : null;
+                                        const taskEndDate = hasTasks ? businessDays[Math.max(...laneTasks.map(t => t.start + t.duration - 1))] : null;
                                         const isDragging = draggingSwimlane && draggingSwimlane.index === i;
                                         const isDraggedOver = draggingSwimlane && draggingSwimlane.newIndex === i && draggingSwimlane.index !== i;
                                         return html`
@@ -754,7 +792,7 @@
                                                     : html`<div class="swimlane-container flex-1 flex items-center justify-between cursor-pointer select-none py-1">
                                                         <div onClick=${() => setEditingRowIdx(i)} class="swimlane-inner flex flex-col">
                                                             <span class="swimlane-label text-sm font-bold text-slate-700 truncate">${label}</span>
-                                                            <span class="swimlane-days text-[12px] text-slate-400 font-medium bg-none">${hasTasks ? `Days ${startDay}-${endDay}` : 'No tasks scheduled'}</span>
+                                                            <span class="swimlane-days text-[12px] text-slate-400 font-medium bg-none">${hasTasks ? `${taskStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${taskEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'No tasks scheduled'}</span>
                                                         </div>
                                                         <button onClick=${(e) => { e.stopPropagation(); setSwimlaneMenuOpen(i); }} class="swimlane-button font-bold text-slate-400 hover:text-slate-600 p-1 rounded">...</button>
                                                     </div>`
@@ -785,11 +823,15 @@
                         <div class="flex-1 overflow-visible relative bg-white" onScroll=${(e) => setContainerScroll({ left: e.target.scrollLeft, top: e.target.scrollTop })}>
                             <div class="sticky top-0 bg-slate-50 border-b shadow-sm">
                                 <div class="flex border-b border-slate-200">
-                                    ${Array.from({ length: Math.ceil(totalDaysCount / 5) }).map((_, i) => html`
-                                        <div key=${i} style="width: ${dayWidth * 5}px" class="flex-shrink-0 border-r border-slate-200 flex items-center justify-center text-[9px] font-black text-indigo-600 uppercase tracking-widest h-5 bg-indigo-50/30">Week ${i + 1}</div>
+                                    ${monthGroups.map(group => html`
+                                        <div style="width: ${dayWidth * group.days}px" class="flex-shrink-0 border-r border-slate-200 flex items-center justify-center text-[9px] font-black text-indigo-600 uppercase tracking-widest h-5 bg-indigo-50/30">${group.month}</div>
                                     `)}
                                 </div>
-                                <div class="flex h-7">${timelineDays.map(day => html`<div key=${day} style="width: ${dayWidth}px" class="flex-shrink-0 border-r border-slate-200 flex flex-col items-center justify-center text-[9px] font-bold ${day < currentDay ? 'bg-slate-300 text-slate-500' : 'text-slate-400'}" title=${getDayTooltip(day)}><span>${day + 1}</span></div>`)}</div>
+                                <div class="flex h-7">${Array.from({ length: totalDaysCount }, (_, day) => {
+                                    const date = businessDays[day];
+                                    const formatted = date.toLocaleDateString('en-US', { day: 'numeric' });
+                                    return html`<div key=${day} style="width: ${dayWidth}px" class="flex-shrink-0 border-r border-slate-200 flex flex-col items-center justify-center text-[9px] font-bold ${day < currentDay ? 'bg-slate-300 text-slate-500' : 'text-slate-400'}" title=${getDayTooltip(day)}><span>${formatted}</span></div>`;
+                                })}</div>
                             </div>
 
                             <div class="gantt-grid relative" style="width: ${totalDaysCount * dayWidth}px; height: ${Math.max(rowLabels.length + 1, 12) * ROW_HEIGHT}px; background-size: ${dayWidth}px ${ROW_HEIGHT}px;">
@@ -969,8 +1011,8 @@ ${JSON.stringify(JSON_SCHEMA, null, 2)}
                     ${swimlaneInfoOpen !== null && (() => {
                         const laneTasks = tasks.filter(t => t.row === swimlaneInfoOpen).sort((a,b)=>a.start-b.start);
                         const totalStories = laneTasks.length;
-                        const startDay = totalStories > 0 ? Math.min(...laneTasks.map(t => t.start)) + 1 : 0;
-                        const endDay = totalStories > 0 ? Math.max(...laneTasks.map(t => t.start + t.duration)) : 0;
+                        const taskStartDate = totalStories > 0 ? businessDays[Math.min(...laneTasks.map(t => t.start))] : null;
+                        const taskEndDate = totalStories > 0 ? businessDays[Math.max(...laneTasks.map(t => t.start + t.duration - 1))] : null;
                         const occupiedDays = new Set();
                         laneTasks.forEach(t => {
                             for(let d=t.start; d<t.start+t.duration; d++) occupiedDays.add(d);
@@ -978,17 +1020,23 @@ ${JSON.stringify(JSON_SCHEMA, null, 2)}
                         const emptyRanges = [];
                         let inGap = false;
                         let gapStart = null;
-                        for(let d=0; d<endDay; d++){
+                        for(let d=0; d<totalDaysCount; d++){
                             if(!occupiedDays.has(d)){
                                 if(!inGap){ gapStart = d; inGap=true; }
                             }else{
                                 if(inGap){
-                                    emptyRanges.push(`${gapStart+1}-${d}`);
+                                    const start = businessDays[gapStart].toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                    const end = businessDays[d-1].toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                    emptyRanges.push(`${start}-${end}`);
                                     inGap=false;
                                 }
                             }
                         }
-                        if(inGap) emptyRanges.push(`${gapStart+1}-${endDay}`);
+                        if(inGap) {
+                            const start = businessDays[gapStart].toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                            const end = businessDays[totalDaysCount-1].toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                            emptyRanges.push(`${start}-${end}`);
+                        }
                         return html`
                             <div class="fixed inset-0 z-[1100] flex items-center justify-center p-6 modal-overlay" onClick=${() => setSwimlaneInfoOpen(null)}>
                                 <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col" onClick=${e => e.stopPropagation()}>
@@ -999,8 +1047,8 @@ ${JSON.stringify(JSON_SCHEMA, null, 2)}
                                     <div class="p-6 space-y-4">
                                         <div><strong>Swimlane:</strong> ${rowLabels[swimlaneInfoOpen]}</div>
                                         <div><strong>Total Stories:</strong> ${totalStories}</div>
-                                        <div><strong>Start Day:</strong> D${startDay}</div>
-                                        <div><strong>End Day:</strong> D${endDay}</div>
+                                        <div><strong>Start Day:</strong> ${taskStartDate ? taskStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}</div>
+                                        <div><strong>End Day:</strong> ${taskEndDate ? taskEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}</div>
                                         <div><strong>Empty Day Ranges:</strong> ${emptyRanges.length > 0 ? emptyRanges.join(', ') : 'None'}</div>
                                     </div>
                                     <div class="px-6 py-4 border-t bg-slate-50 flex justify-end">
