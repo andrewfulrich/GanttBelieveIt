@@ -219,6 +219,8 @@
             const [gapDays, setGapDays] = useState(1);
             const [isSettingsOpen, setIsSettingsOpen] = useState(false);
             const [editingEpicId, setEditingEpicId] = useState(null);
+            const [isPivoted, setIsPivoted] = useState(false);
+            const [tempData, setTempData] = useState(null);
             
             const dayWidth = DAY_WIDTH_BASE * zoom;
             const containerRef = useRef(null);
@@ -233,8 +235,10 @@
             });
 
             useEffect(() => {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, rowLabels, epics, settings }));
-            }, [tasks, rowLabels, epics, settings]);
+                if (!isPivoted) {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, rowLabels, epics, settings }));
+                }
+            }, [tasks, rowLabels, epics, settings, isPivoted]);
 
             useEffect(() => {
                 localStorage.setItem('gantt-sidebar-width', sidebarWidth.toString());
@@ -661,6 +665,51 @@
                 return tooltip;
             };
 
+            const togglePivot = () => {
+                if (!isPivoted) {
+                    // Save current data
+                    setTempData({ tasks, rowLabels, epics, settings });
+                    // Transform
+                    const newRowLabels = epics.map(e => e.name);
+                    const newEpics = rowLabels.map((label, i) => ({ id: `swimlane${i}`, name: label, color: epics[i % epics.length]?.color || '#64748b' }));
+                    const newTasks = tasks.map(task => {
+                        const oldEpic = epics.find(e => e.id === task.epic);
+                        const newRow = oldEpic ? epics.indexOf(oldEpic) : 0;
+                        const newEpic = `swimlane${task.row}`;
+                        return { ...task, row: newRow, epic: newEpic };
+                    });
+                    setTasks(newTasks);
+                    setRowLabels(newRowLabels);
+                    setEpics(newEpics);
+                    setIsPivoted(true);
+                } else {
+                    // Un-pivot
+                    if (!tempData) return;
+                    // Sync changes back
+                    const updatedEpics = tempData.epics.map((oldEpic, i) => {
+                        if (i < rowLabels.length) {
+                            return { ...oldEpic, name: rowLabels[i] };
+                        }
+                        return oldEpic;
+                    });
+                    const updatedRowLabels = tempData.rowLabels.map((oldLabel, i) => {
+                        const newEpic = epics.find(e => e.id === `swimlane${i}`);
+                        return newEpic ? newEpic.name : oldLabel;
+                    });
+                    const syncedTasks = tasks.map(task => {
+                        const oldEpicIndex = task.row;
+                        const oldRow = parseInt(task.epic.slice(8)) || 0;
+                        const originalEpic = tempData.epics[oldEpicIndex]?.id || '';
+                        return { ...task, row: oldRow, epic: originalEpic };
+                    });
+                    setTasks(syncedTasks);
+                    setRowLabels(updatedRowLabels);
+                    setEpics(updatedEpics);
+                    setTempData(null);
+                    setIsPivoted(false);
+                }
+            };
+
             return html`
                 <div id="gantt-container" class="flex flex-col h-screen overflow-auto text-slate-800">
                     <header class="bg-white border-b px-6 py-4 flex items-center justify-between shadow-sm" style="position: sticky; top: 0; left: 0; z-index: 50;">
@@ -676,6 +725,9 @@
                                 <button onClick=${() => setZoom(Math.max(0.4, zoom - 0.2))} class="px-3 py-1 hover:bg-white rounded-md transition-all text-xs font-bold active:scale-95">Zoom Out</button>
                                 <span class="px-3 text-xs font-black text-indigo-600 w-16 text-center">${Math.round(zoom * 100)}%</span>
                                 <button onClick=${() => setZoom(Math.min(2.5, zoom + 0.2))} class="px-3 py-1 hover:bg-white rounded-md transition-all text-xs font-bold active:scale-95">Zoom In</button>
+                            </div>
+                            <div class="flex items-center bg-slate-100 rounded-lg p-1 border border-slate-200">
+                                <button onClick=${togglePivot} class="px-3 py-1 hover:bg-white rounded-md transition-all text-xs font-bold active:scale-95">${isPivoted ? 'Unpivot' : 'Pivot'}</button>
                             </div>
                             <button onClick=${() => setIsSettingsOpen(true)} class="bg-white border border-slate-200 hover:border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">⚙ Settings</button>
                             <div class="h-8 w-px bg-slate-200 mx-1"></div>
@@ -883,7 +935,7 @@
                             <span>Project Span: <span class="text-slate-900">${projectEndDay} Days</span></span>
                         </div>
                         <div class="flex items-center gap-4">
-                            <span class="text-emerald-500 font-black">● Auto-Saving</span>
+                            <span class="${isPivoted ? 'text-rose-500' : 'text-emerald-500'} font-black">● ${isPivoted ? 'Auto-Saving Off' : 'Auto-Saving'}</span>
                             <button onClick=${() => setIsHelpOpen(true)} class="bg-slate-800 text-white px-3 py-1 rounded hover:bg-black transition-colors">Help</button>
                         </div>
                     </footer>
@@ -902,6 +954,7 @@
                                             <li><span class="font-bold">Move:</span> Drag the middle of a task bar.</li>
                                             <li><span class="font-bold">Resize:</span> Drag the left or right edge of a task bar.</li>
                                             <li><span class="font-bold">Reorder Swimlanes:</span> Drag swimlane labels in the sidebar to reorder them.</li>
+                                            <li><span class="font-bold">Pivot View:</span> Click the "Pivot" button to switch between viewing epics as swimlanes and swimlanes as epics.</li>
                                             <li><span class="font-bold">Minimum Size:</span> Tasks cannot be smaller than 1 day.</li>
                                             <li><span class="font-bold">Collision:</span> Rescheduling pushes subsequent tasks to prevent overlap.</li>
                                             <li><span class="font-bold">Management:</span> Add swimlanes or tasks, and click items to edit names.</li>

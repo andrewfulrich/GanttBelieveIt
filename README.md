@@ -10,6 +10,7 @@ Check it out at https://andrewfulrich.github.io/GanttBelieveIt/
 - **Multiple Swimlanes**: Organize tasks into different categories or teams
 - **Epic-Based Colors**: Group tasks by epics with shared colors instead of individual task colors
 - **Interactive Legend**: Manage epics with color pickers and inline name editing
+- **Pivot View**: Switch between viewing epics as swimlanes and swimlanes as epics
 - **Zoom Controls**: Adjust timeline zoom from 40% to 250%
 - **Import/Export**: Save and load project data as JSON files
 - **Local Storage**: Automatic saving to your browser's local storage
@@ -60,8 +61,9 @@ Then visit `http://localhost:3000`
 6. **Manage Epics**: Use the legend in the bottom-right to add, edit, and delete epics
 7. **Customize Colors**: Click epic color swatches in the legend to change colors
 8. **Edit Epic Names**: Click epic names in the legend to rename them
-9. **Zoom**: Use the zoom controls in the header
-10. **Import/Export**: Use the buttons to save/load project data
+9. **Pivot View**: Click the "Pivot" button to switch between viewing epics as swimlanes and swimlanes as epics
+10. **Zoom**: Use the zoom controls in the header
+11. **Import/Export**: Use the buttons to save/load project data
 
 ## Epic Management
 
