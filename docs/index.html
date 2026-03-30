@@ -766,8 +766,8 @@
                                     return html`
                                         <div key=${task.id} data-task-id=${task.id} onMouseDown=${(e) => onMouseDown(e, task)}
                                             class="absolute task-bar group rounded-lg border border-black/10 flex flex-col justify-center px-3 text-white shadow-sm ${isDragging ? 'opacity-30 z-0' : 'hover:shadow-lg'}"
-                                            style="left: ${displayTask.start * dayWidth + 2}px; top: ${displayTask.row * ROW_HEIGHT + 10}px; width: ${displayTask.duration * dayWidth - 4}px; height: 42px; background-color: ${getTaskColor(displayTask)}; pointer-events: ${isDragging && dragInfo.current.mode === 'move' ? 'none' : 'auto'}; opacity: ${isPastCompleted ? 0.7 : 1};">
-                                            
+                                            style="left: ${displayTask.start * dayWidth + 2}px; top: ${displayTask.row * ROW_HEIGHT + 10}px; width: ${displayTask.duration * dayWidth - 4}px; height: 42px; background-color: ${getTaskColor(displayTask)}; pointer-events: ${isDragging && dragInfo.current.mode === 'move' ? 'none' : 'auto'};">
+                                            <div class="absolute bg-slate-300/50" style="left: 0px; width:100%; height:100%; ${isPastCompleted ?  '' : 'display: none;'};"></div>
                                             <div class="resize-handle-l"></div>
                                             <div class="resize-handle-r"></div>
 
