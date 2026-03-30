@@ -219,8 +219,7 @@
             const [gapDays, setGapDays] = useState(1);
             const [isSettingsOpen, setIsSettingsOpen] = useState(false);
             const [editingEpicId, setEditingEpicId] = useState(null);
-            const [isPivoted, setIsPivoted] = useState(false);
-            const [tempData, setTempData] = useState(null);
+            const [confirmPivot, setConfirmPivot] = useState(false);
             
             const dayWidth = DAY_WIDTH_BASE * zoom;
             const containerRef = useRef(null);
@@ -235,10 +234,8 @@
             });
 
             useEffect(() => {
-                if (!isPivoted) {
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, rowLabels, epics, settings }));
-                }
-            }, [tasks, rowLabels, epics, settings, isPivoted]);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, rowLabels, epics, settings }));
+            }, [tasks, rowLabels, epics, settings]);
 
             useEffect(() => {
                 localStorage.setItem('gantt-sidebar-width', sidebarWidth.toString());
@@ -665,49 +662,19 @@
                 return tooltip;
             };
 
-            const togglePivot = () => {
-                if (!isPivoted) {
-                    // Save current data
-                    setTempData({ tasks, rowLabels, epics, settings });
-                    // Transform
-                    const newRowLabels = epics.map(e => e.name);
-                    const newEpics = rowLabels.map((label, i) => ({ id: `swimlane${i}`, name: label, color: epics[i % epics.length]?.color || '#64748b' }));
-                    const newTasks = tasks.map(task => {
-                        const oldEpic = epics.find(e => e.id === task.epic);
-                        const newRow = oldEpic ? epics.indexOf(oldEpic) : 0;
-                        const newEpic = `swimlane${task.row}`;
-                        return { ...task, row: newRow, epic: newEpic };
-                    });
-                    setTasks(newTasks);
-                    setRowLabels(newRowLabels);
-                    setEpics(newEpics);
-                    setIsPivoted(true);
-                } else {
-                    // Un-pivot
-                    if (!tempData) return;
-                    // Sync changes back
-                    const updatedEpics = tempData.epics.map((oldEpic, i) => {
-                        if (i < rowLabels.length) {
-                            return { ...oldEpic, name: rowLabels[i] };
-                        }
-                        return oldEpic;
-                    });
-                    const updatedRowLabels = tempData.rowLabels.map((oldLabel, i) => {
-                        const newEpic = epics.find(e => e.id === `swimlane${i}`);
-                        return newEpic ? newEpic.name : oldLabel;
-                    });
-                    const syncedTasks = tasks.map(task => {
-                        const oldEpicIndex = task.row;
-                        const oldRow = parseInt(task.epic.slice(8)) || 0;
-                        const originalEpic = tempData.epics[oldEpicIndex]?.id || '';
-                        return { ...task, row: oldRow, epic: originalEpic };
-                    });
-                    setTasks(syncedTasks);
-                    setRowLabels(updatedRowLabels);
-                    setEpics(updatedEpics);
-                    setTempData(null);
-                    setIsPivoted(false);
-                }
+            const applyPivot = () => {
+                // Transform
+                const newRowLabels = epics.map(e => e.name);
+                const newEpics = rowLabels.map((label, i) => ({ id: `swimlane${i}`, name: label, color: epics[i % epics.length]?.color || '#64748b' }));
+                const newTasks = tasks.map(task => {
+                    const oldEpic = epics.find(e => e.id === task.epic);
+                    const newRow = oldEpic ? epics.indexOf(oldEpic) : 0;
+                    const newEpic = `swimlane${task.row}`;
+                    return { ...task, row: newRow, epic: newEpic };
+                });
+                setTasks(newTasks);
+                setRowLabels(newRowLabels);
+                setEpics(newEpics);
             };
 
             return html`
@@ -727,7 +694,7 @@
                                 <button onClick=${() => setZoom(Math.min(2.5, zoom + 0.2))} class="px-3 py-1 hover:bg-white rounded-md transition-all text-xs font-bold active:scale-95">Zoom In</button>
                             </div>
                             <div class="flex items-center bg-slate-100 rounded-lg p-1 border border-slate-200">
-                                <button onClick=${togglePivot} class="px-3 py-1 hover:bg-white rounded-md transition-all text-xs font-bold active:scale-95">${isPivoted ? 'Unpivot' : 'Pivot'}</button>
+                                <button onClick=${() => setConfirmPivot(true)} class="px-3 py-1 hover:bg-white rounded-md transition-all text-xs font-bold active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">Pivot</button>
                             </div>
                             <button onClick=${() => setIsSettingsOpen(true)} class="bg-white border border-slate-200 hover:border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">⚙ Settings</button>
                             <div class="h-8 w-px bg-slate-200 mx-1"></div>
@@ -935,7 +902,7 @@
                             <span>Project Span: <span class="text-slate-900">${projectEndDay} Days</span></span>
                         </div>
                         <div class="flex items-center gap-4">
-                            <span class="${isPivoted ? 'text-rose-500' : 'text-emerald-500'} font-black">● ${isPivoted ? 'Auto-Saving Off' : 'Auto-Saving'}</span>
+                            <span class="text-emerald-500 font-black">● Auto-Saving</span>
                             <button onClick=${() => setIsHelpOpen(true)} class="bg-slate-800 text-white px-3 py-1 rounded hover:bg-black transition-colors">Help</button>
                         </div>
                     </footer>
@@ -954,7 +921,7 @@
                                             <li><span class="font-bold">Move:</span> Drag the middle of a task bar.</li>
                                             <li><span class="font-bold">Resize:</span> Drag the left or right edge of a task bar.</li>
                                             <li><span class="font-bold">Reorder Swimlanes:</span> Drag swimlane labels in the sidebar to reorder them.</li>
-                                            <li><span class="font-bold">Pivot View:</span> Click the "Pivot" button to switch between viewing epics as swimlanes and swimlanes as epics.</li>
+                                            <li><span class="font-bold">Pivot View:</span> Click the "Pivot" button to convert epics to swimlanes and swimlanes to epics.</li>
                                             <li><span class="font-bold">Minimum Size:</span> Tasks cannot be smaller than 1 day.</li>
                                             <li><span class="font-bold">Collision:</span> Rescheduling pushes subsequent tasks to prevent overlap.</li>
                                             <li><span class="font-bold">Management:</span> Add swimlanes or tasks, and click items to edit names.</li>
@@ -1105,6 +1072,35 @@ ${JSON.stringify(JSON_SCHEMA, null, 2)}
                             </div>
                         `;
                     })()}
+
+                    ${confirmPivot && html`
+                        <div class="fixed inset-0 z-[1100] flex items-center justify-center p-6 modal-overlay" onClick=${() => setConfirmPivot(false)}>
+                            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col" onClick=${e => e.stopPropagation()}>
+                                <div class="px-6 py-4 border-b flex justify-between items-center bg-slate-50">
+                                    <h2 class="text-lg font-bold text-slate-900">Confirm Pivot</h2>
+                                    <button onClick=${() => setConfirmPivot(false)} class="text-slate-400 hover:text-slate-600 text-2xl leading-none">✖</button>
+                                </div>
+                                <div class="p-6 space-y-4">
+                                    <p class="text-sm text-slate-600">
+                                        This action will convert epics to swimlanes and swimlanes to epics.
+                                    </p>
+                                    <p class="text-sm text-slate-600">
+                                        It is recommended to export your data first to preserve the current state.
+                                    </p>
+                                    <p class="text-sm font-bold text-rose-600">
+                                        Are you sure you want to proceed?
+                                    </p>
+                                </div>
+                                <div class="px-6 py-4 border-t bg-slate-50 flex justify-end gap-2">
+                                    <button onClick=${() => setConfirmPivot(false)} class="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold">Cancel</button>
+                                    <button onClick=${() => {
+                                        applyPivot();
+                                        setConfirmPivot(false);
+                                    }} class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700">Confirm Pivot</button>
+                                </div>
+                            </div>
+                        </div>
+                    `}
 
                     ${isSettingsOpen && html`
                         <div class="fixed inset-0 z-[1100] flex items-center justify-center p-6 modal-overlay" onClick=${() => setIsSettingsOpen(false)}>
