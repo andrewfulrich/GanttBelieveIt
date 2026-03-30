@@ -216,7 +216,7 @@
             const [confirmRemoveGaps, setConfirmRemoveGaps] = useState(null);
             const [createGapModal, setCreateGapModal] = useState(null);
             const [gapAfterTaskId, setGapAfterTaskId] = useState(null);
-            const [gapDays, setGapDays] = useState(1);
+            const [gapDate, setGapDate] = useState('');
             const [isSettingsOpen, setIsSettingsOpen] = useState(false);
             const [editingColorLabelId, setEditingColorLabelId] = useState(null);
             const [confirmPivot, setConfirmPivot] = useState(false);
@@ -810,7 +810,7 @@
                                                 </div>`}
                                                 ${swimlaneMenuOpen === i && html`<div class="swimlane-menu absolute right-2 top-2 bg-white border shadow rounded p-1 z-10">
                                                     <button onClick=${() => { setSwimlaneMenuOpen(null); setSwimlaneInfoOpen(i); }} class="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100">Info</button>
-                                                    <button onClick=${() => { setSwimlaneMenuOpen(null); setCreateGapModal(i); setGapAfterTaskId(null); setGapDays(1); }} class="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100">Create Gap in Swimlane</button>
+            <button onClick=${() => { setSwimlaneMenuOpen(null); setCreateGapModal(i); setGapAfterTaskId(null); setGapDate(''); }} class="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100">Push Tasks in Swimlane</button>
                                                     <button onClick=${() => { setSwimlaneMenuOpen(null); setConfirmRemoveGaps(i); }} class="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100">Remove Gaps in Swimlane</button>
                                                 </div>`}
                                             </div>`;
@@ -1102,43 +1102,44 @@ ${JSON.stringify(JSON_SCHEMA, null, 2)}
                             <div class="fixed inset-0 z-[1100] flex items-center justify-center p-6 modal-overlay" onClick=${() => setCreateGapModal(null)}>
                                 <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col" onClick=${e => e.stopPropagation()}>
                                     <div class="px-6 py-4 border-b flex justify-between items-center bg-slate-50">
-                                        <h2 class="text-lg font-bold text-slate-900">Create Gap</h2>
+                    <h2 class="text-lg font-bold text-slate-900">Push Tasks</h2>
                                         <button onClick=${() => setCreateGapModal(null)} class="text-slate-400 hover:text-slate-600 text-2xl leading-none">✖</button>
                                     </div>
                                     <div class="p-6 space-y-4">
                                         <div>
-                                            <label class="block text-sm font-bold text-slate-700 mb-2">Create gap after story:</label>
-                                            <select value=${gapAfterTaskId || ''} onChange=${(e) => setGapAfterTaskId(e.target.value)} class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                            <label class="block text-sm font-bold text-slate-700 mb-2">Push tasks starting with:</label>
+                                            <select value=${gapAfterTaskId || ''} onChange=${(e) => { setGapAfterTaskId(e.target.value); const task = laneTasks.find(t => t.id === e.target.value); if (task) { const nextDay = businessDays[task.start + 1]; setGapDate(nextDay ? nextDay.toISOString().split('T')[0] : ''); } else setGapDate(''); }} class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
                                                 <option value="">Select a story...</option>
                                                 ${laneTasks.map(task => html`<option value=${task.id}>${task.name} (ID: ${task.id})</option>`)}
                                             </select>
                                         </div>
                                         <div>
-                                            <label class="block text-sm font-bold text-slate-700 mb-2">Gap duration (in business days):</label>
-                                            <input type="number" min="1" value=${gapDays} onInput=${(e) => setGapDays(Math.max(1, parseInt(e.target.value) || 1))} class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                            <label class="block text-sm font-bold text-slate-700 mb-2">Push to date:</label>
+                                            <input type="date" value=${gapDate} onChange=${(e) => setGapDate(e.target.value)} min=${gapAfterTaskId ? (() => { const task = laneTasks.find(t => t.id === gapAfterTaskId); const nextDay = businessDays[task.start + 1]; return nextDay ? nextDay.toISOString().split('T')[0] : ''; })() : ''} class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                                         </div>
                                     </div>
                                     <div class="px-6 py-4 border-t bg-slate-50 flex justify-end gap-2">
                                         <button onClick=${() => setCreateGapModal(null)} class="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold">Cancel</button>
                                         <button onClick=${() => {
-                                            if (!gapAfterTaskId) return;
+                                            if (!gapAfterTaskId || !gapDate) return;
+                                            const selectedTask = tasks.find(t => t.id === gapAfterTaskId);
+                                            const selectedDayIndex = countBusinessDays(startDate, new Date(gapDate + 'T00:00:00')) - 1;
+                                            if (selectedDayIndex <= selectedTask.start) return; // prevent moving back
+                                            const offset = selectedDayIndex - selectedTask.start;
                                             setTasks(prevTasks => {
-                                                const laneTasks = prevTasks.filter(t => t.row === createGapModal).sort((a,b)=>a.start-b.start);
-                                                const afterTaskIndex = laneTasks.findIndex(t => t.id === gapAfterTaskId);
-                                                if (afterTaskIndex === -1 || afterTaskIndex === laneTasks.length - 1) return prevTasks;
-                                                
-                                                const afterTask = laneTasks[afterTaskIndex];
-                                                const gapStart = afterTask.start + afterTask.duration;
-                                                
+                                                const rowTasks = prevTasks.filter(t => t.row === selectedTask.row).sort((a,b)=>a.start-b.start);
+                                                const taskIndex = rowTasks.findIndex(t => t.id === gapAfterTaskId);
                                                 return prevTasks.map(t => {
-                                                    if (t.row !== createGapModal) return t;
-                                                    const taskIndex = laneTasks.findIndex(lt => lt.id === t.id);
-                                                    if (taskIndex <= afterTaskIndex) return t;
-                                                    return { ...t, start: t.start + gapDays };
+                                                    if (t.row !== selectedTask.row) return t;
+                                                    const index = rowTasks.findIndex(rt => rt.id === t.id);
+                                                    if (index >= taskIndex) {
+                                                        return { ...t, start: t.start + offset };
+                                                    }
+                                                    return t;
                                                 });
                                             });
                                             setCreateGapModal(null);
-                                        }} class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700" disabled=${!gapAfterTaskId}>Create Gap</button>
+                                        }} class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700" disabled=${!gapAfterTaskId || !gapDate}>Push Tasks</button>
                                     </div>
                                 </div>
                             </div>
