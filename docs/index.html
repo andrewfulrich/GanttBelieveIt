@@ -680,12 +680,11 @@
                 });
                 const sortedIndices = rowMinStarts.map((_, i) => i).sort((a, b) => rowMinStarts[a] - rowMinStarts[b]);
                 const sortedRowLabels = sortedIndices.map(i => newRowLabels[i]);
-                const sortedEpics = sortedIndices.map(i => newEpics[i]);
                 const sortedTasks = newTasks.map(task => ({ ...task, row: sortedIndices.indexOf(task.row) }));
 
                 setTasks(sortedTasks);
                 setRowLabels(sortedRowLabels);
-                setEpics(sortedEpics);
+                setEpics(newEpics);
             };
 
             return html`
