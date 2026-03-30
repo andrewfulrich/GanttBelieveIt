@@ -113,7 +113,7 @@
 
         const DAY_WIDTH_BASE = 40;
         const ROW_HEIGHT = 60;
-        const STORAGE_KEY = 'gantt-believe-it-data-v8';
+        const STORAGE_KEY = 'gantt-believe-it-data-v9';
 
         const JSON_SCHEMA = {
             "$schema": "http://json-schema.org/draft-07/schema#",
@@ -137,9 +137,17 @@
                 "rowLabels": {
                     "type": "array",
                     "items": { "type": "string" }
+                },
+                "settings": {
+                    "type": "object",
+                    "properties": {
+                        "showTitles": { "type": "boolean", "description": "Whether to display task titles" },
+                        "projectStartDate": { "type": "string", "description": "Project start date in YYYY-MM-DD format" }
+                    },
+                    "required": ["showTitles", "projectStartDate"]
                 }
             },
-            "required": ["tasks", "rowLabels"]
+            "required": ["tasks", "rowLabels", "settings"]
         };
 
         const initialTasks = [
@@ -150,6 +158,8 @@
 
         const initialRowLabels = ["Strategic Planning", "UX Design"];
 
+        const initialSettings = { showTitles: true, projectStartDate: '' };
+
         const App = () => {
             const [tasks, setTasks] = useState(() => {
                 const saved = localStorage.getItem(STORAGE_KEY);
@@ -158,6 +168,10 @@
             const [rowLabels, setRowLabels] = useState(() => {
                 const saved = localStorage.getItem(STORAGE_KEY);
                 return saved ? JSON.parse(saved).rowLabels : initialRowLabels;
+            });
+            const [settings, setSettings] = useState(() => {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                return saved ? JSON.parse(saved).settings : initialSettings;
             });
 
             const [zoom, setZoom] = useState(1);
@@ -181,6 +195,7 @@
             const [createGapModal, setCreateGapModal] = useState(null);
             const [gapAfterTaskId, setGapAfterTaskId] = useState(null);
             const [gapDays, setGapDays] = useState(1);
+            const [isSettingsOpen, setIsSettingsOpen] = useState(false);
             
             const dayWidth = DAY_WIDTH_BASE * zoom;
             const containerRef = useRef(null);
@@ -195,8 +210,8 @@
             });
 
             useEffect(() => {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, rowLabels }));
-            }, [tasks, rowLabels]);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, rowLabels, settings }));
+            }, [tasks, rowLabels, settings]);
 
             useEffect(() => {
                 localStorage.setItem('gantt-sidebar-width', sidebarWidth.toString());
@@ -227,7 +242,7 @@
             }, [editingTaskId, editingRowIdx, swimlaneMenuOpen, swimlaneInfoOpen, confirmRemoveGaps]);
 
             const exportData = () => {
-                const data = JSON.stringify({ tasks, rowLabels }, null, 2);
+                const data = JSON.stringify({ tasks, rowLabels, settings }, null, 2);
                 const blob = new Blob([data], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -244,9 +259,10 @@
                 reader.onload = (event) => {
                     try {
                         const json = JSON.parse(event.target.result);
-                        if (json.tasks && json.rowLabels) {
+                        if (json.tasks && json.rowLabels && json.settings) {
                             setTasks(json.tasks);
                             setRowLabels(json.rowLabels);
+                            setSettings(json.settings);
                         }
                     } catch (err) { console.error(err); }
                 };
@@ -513,6 +529,15 @@
             const totalDaysCount = Math.max(90, projectEndDay);
             const timelineDays = Array.from({ length: totalDaysCount }, (_, i) => i);
 
+            const currentDay = useMemo(() => {
+                if (!settings.projectStartDate) return -1;
+                const startDate = new Date(settings.projectStartDate);
+                const today = new Date();
+                const diffTime = today - startDate;
+                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                return diffDays;
+            }, [settings.projectStartDate]);
+
             const getDayTooltip = (day) => {
                 let tooltip = `Day ${day + 1}`;
                 rowLabels.forEach((label, rowIndex) => {
@@ -540,6 +565,7 @@
                                 <span class="px-3 text-xs font-black text-indigo-600 w-16 text-center">${Math.round(zoom * 100)}%</span>
                                 <button onClick=${() => setZoom(Math.min(2.5, zoom + 0.2))} class="px-3 py-1 hover:bg-white rounded-md transition-all text-xs font-bold active:scale-95">Zoom In</button>
                             </div>
+                            <button onClick=${() => setIsSettingsOpen(true)} class="bg-white border border-slate-200 hover:border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">⚙ Settings</button>
                             <div class="h-8 w-px bg-slate-200 mx-1"></div>
                             <div class="flex gap-2">
                                 <button onClick=${exportData} class="bg-white border border-slate-200 hover:border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95">Export</button>
@@ -609,10 +635,11 @@
                                         <div key=${i} style="width: ${dayWidth * 5}px" class="flex-shrink-0 border-r border-slate-200 flex items-center justify-center text-[9px] font-black text-indigo-600 uppercase tracking-widest h-5 bg-indigo-50/30">Week ${i + 1}</div>
                                     `)}
                                 </div>
-                                <div class="flex h-7">${timelineDays.map(day => html`<div key=${day} style="width: ${dayWidth}px" class="flex-shrink-0 border-r border-slate-200 flex flex-col items-center justify-center text-[9px] font-bold text-slate-400" title=${getDayTooltip(day)}><span>${day + 1}</span></div>`)}</div>
+                                <div class="flex h-7">${timelineDays.map(day => html`<div key=${day} style="width: ${dayWidth}px" class="flex-shrink-0 border-r border-slate-200 flex flex-col items-center justify-center text-[9px] font-bold ${day < currentDay ? 'bg-slate-300 text-slate-500' : 'text-slate-400'}" title=${getDayTooltip(day)}><span>${day + 1}</span></div>`)}</div>
                             </div>
 
                             <div class="gantt-grid relative" style="width: ${totalDaysCount * dayWidth}px; height: ${Math.max(rowLabels.length + 1, 12) * ROW_HEIGHT}px; background-size: ${dayWidth}px ${ROW_HEIGHT}px;">
+                                ${currentDay >= 0 && html`<div class="absolute top-0 left-0 bg-slate-300/20 pointer-events-none" style="width: ${Math.min(currentDay, totalDaysCount) * dayWidth}px; height: 100%;"></div>`}
                                 ${tasks.map(task => {
                                     const isDragging = draggingTask && draggingTask.id === task.id;
                                     const isEditing = editingTaskId === task.id;
@@ -633,10 +660,11 @@
                                     const taskWidth = displayTask.duration * dayWidth - 4;
                                     const shouldRotate = labelWidth > taskWidth && hasNextTask;
                                     
+                                    const isPastCompleted = currentDay >= 0 && displayTask.start + displayTask.duration <= currentDay;
                                     return html`
                                         <div key=${task.id} data-task-id=${task.id} onMouseDown=${(e) => onMouseDown(e, task)}
                                             class="absolute task-bar group rounded-lg border border-black/10 flex flex-col justify-center px-3 text-white shadow-sm ${isDragging ? 'opacity-30 z-0' : 'hover:shadow-lg'}"
-                                            style="left: ${displayTask.start * dayWidth + 2}px; top: ${displayTask.row * ROW_HEIGHT + 10}px; width: ${displayTask.duration * dayWidth - 4}px; height: 42px; background-color: ${displayTask.color}; pointer-events: ${isDragging && dragInfo.current.mode === 'move' ? 'none' : 'auto'};">
+                                            style="left: ${displayTask.start * dayWidth + 2}px; top: ${displayTask.row * ROW_HEIGHT + 10}px; width: ${displayTask.duration * dayWidth - 4}px; height: 42px; background-color: ${displayTask.color}; pointer-events: ${isDragging && dragInfo.current.mode === 'move' ? 'none' : 'auto'}; opacity: ${isPastCompleted ? 0.7 : 1};">
                                             
                                             <div class="resize-handle-l"></div>
                                             <div class="resize-handle-r"></div>
@@ -666,8 +694,8 @@
                                                         <div class="text-[12px] font-medium opacity-80 leading-tight" style=${shouldRotate ? 'transform: rotate(-30deg) translateX(0); transform-origin: left center; z-index: 1000;' : ''}>
                                                             ID: ${task.id}
                                                         </div>
-                                                        <div class="text-sm font-bold leading-tight">${task.name}</div>
-                                                        <div class="text-[12px] font-medium opacity-80 leading-tight">
+                                                        <div class="text-sm font-bold leading-tight" style=${!settings.showTitles ? 'display: none;' : ''}>${task.name}</div>
+                                                        <div class="text-[12px] font-medium opacity-80 leading-tight" style=${!settings.showTitles ? 'display: none;' : ''}>
                                                             ${task.duration} Days
                                                         </div>
                                                     </div>`
@@ -859,6 +887,32 @@ ${JSON.stringify(JSON_SCHEMA, null, 2)}
                             </div>
                         `;
                     })()}
+
+                    ${isSettingsOpen && html`
+                        <div class="fixed inset-0 z-[1100] flex items-center justify-center p-6 modal-overlay" onClick=${() => setIsSettingsOpen(false)}>
+                            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col" onClick=${e => e.stopPropagation()}>
+                                <div class="px-6 py-4 border-b flex justify-between items-center bg-slate-50">
+                                    <h2 class="text-lg font-bold text-slate-900">Settings</h2>
+                                    <button onClick=${() => setIsSettingsOpen(false)} class="text-slate-400 hover:text-slate-600 text-2xl leading-none">✖</button>
+                                </div>
+                                <div class="p-6 space-y-4">
+                                    <div>
+                                        <label class="flex items-center gap-2">
+                                            <input type="checkbox" checked=${settings.showTitles} onChange=${(e) => setSettings({ ...settings, showTitles: e.target.checked })} />
+                                            <span class="text-sm font-bold text-slate-700">Show Task Titles</span>
+                                        </label>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-bold text-slate-700 mb-2">Project Start Date</label>
+                                        <input type="date" value=${settings.projectStartDate} onChange=${(e) => setSettings({ ...settings, projectStartDate: e.target.value })} class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                    </div>
+                                </div>
+                                <div class="px-6 py-4 border-t bg-slate-50 flex justify-end">
+                                    <button onClick=${() => setIsSettingsOpen(false)} class="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700 transition-colors">Close</button>
+                                </div>
+                            </div>
+                        </div>
+                    `}
                 </div>
             `;
         };
