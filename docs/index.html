@@ -113,7 +113,7 @@
 
         const DAY_WIDTH_BASE = 40;
         const ROW_HEIGHT = 60;
-        const STORAGE_KEY = 'gantt-believe-it-data-v9';
+        const STORAGE_KEY = 'gantt-believe-it-data-v10';
 
         const JSON_SCHEMA = {
             "$schema": "http://json-schema.org/draft-07/schema#",
@@ -129,14 +129,26 @@
                             "start": { "type": "number" },
                             "duration": { "type": "number" },
                             "row": { "type": "number" },
-                            "color": { "type": "string", "description": "Hex color string" }
+                            "epic": { "type": "string", "description": "Epic ID or empty string for none" }
                         },
-                        "required": ["id", "name", "start", "duration", "row", "color"]
+                        "required": ["id", "name", "start", "duration", "row", "epic"]
                     }
                 },
                 "rowLabels": {
                     "type": "array",
                     "items": { "type": "string" }
+                },
+                "epics": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": { "type": "string" },
+                            "name": { "type": "string" },
+                            "color": { "type": "string", "description": "Hex color string" }
+                        },
+                        "required": ["id", "name", "color"]
+                    }
                 },
                 "settings": {
                     "type": "object",
@@ -147,13 +159,19 @@
                     "required": ["showTitles", "projectStartDate"]
                 }
             },
-            "required": ["tasks", "rowLabels", "settings"]
+            "required": ["tasks", "rowLabels", "epics", "settings"]
         };
 
+        const initialEpics = [
+            { id: 'epic1', name: 'Planning', color: '#6366f1' },
+            { id: 'epic2', name: 'Design', color: '#10b981' },
+            { id: 'epic3', name: 'Testing', color: '#f59e0b' },
+        ];
+
         const initialTasks = [
-            { id: '1', name: 'Planning Phase', start: 2, duration: 5, row: 0, color: '#6366f1' },
-            { id: '2', name: 'Design Concepts', start: 8, duration: 4, row: 1, color: '#10b981' },
-            { id: '3', name: 'Testing Phase', start: 10, duration: 3, row: 0, color: '#f59e0b' },
+            { id: '1', name: 'Planning Phase', start: 2, duration: 5, row: 0, epic: 'epic1' },
+            { id: '2', name: 'Design Concepts', start: 8, duration: 4, row: 1, epic: 'epic2' },
+            { id: '3', name: 'Testing Phase', start: 10, duration: 3, row: 0, epic: 'epic3' },
         ];
 
         const initialRowLabels = ["Strategic Planning", "UX Design"];
@@ -168,6 +186,10 @@
             const [rowLabels, setRowLabels] = useState(() => {
                 const saved = localStorage.getItem(STORAGE_KEY);
                 return saved ? JSON.parse(saved).rowLabels : initialRowLabels;
+            });
+            const [epics, setEpics] = useState(() => {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                return saved ? JSON.parse(saved).epics : initialEpics;
             });
             const [settings, setSettings] = useState(() => {
                 const saved = localStorage.getItem(STORAGE_KEY);
@@ -196,6 +218,7 @@
             const [gapAfterTaskId, setGapAfterTaskId] = useState(null);
             const [gapDays, setGapDays] = useState(1);
             const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+            const [editingEpicId, setEditingEpicId] = useState(null);
             
             const dayWidth = DAY_WIDTH_BASE * zoom;
             const containerRef = useRef(null);
@@ -210,8 +233,8 @@
             });
 
             useEffect(() => {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, rowLabels, settings }));
-            }, [tasks, rowLabels, settings]);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, rowLabels, epics, settings }));
+            }, [tasks, rowLabels, epics, settings]);
 
             useEffect(() => {
                 localStorage.setItem('gantt-sidebar-width', sidebarWidth.toString());
@@ -242,7 +265,7 @@
             }, [editingTaskId, editingRowIdx, swimlaneMenuOpen, swimlaneInfoOpen, confirmRemoveGaps]);
 
             const exportData = () => {
-                const data = JSON.stringify({ tasks, rowLabels, settings }, null, 2);
+                const data = JSON.stringify({ tasks, rowLabels, epics, settings }, null, 2);
                 const blob = new Blob([data], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -259,9 +282,10 @@
                 reader.onload = (event) => {
                     try {
                         const json = JSON.parse(event.target.result);
-                        if (json.tasks && json.rowLabels && json.settings) {
+                        if (json.tasks && json.rowLabels && json.epics && json.settings) {
                             setTasks(json.tasks);
                             setRowLabels(json.rowLabels);
+                            setEpics(json.epics);
                             setSettings(json.settings);
                         }
                     } catch (err) { console.error(err); }
@@ -318,7 +342,7 @@
                     start: newStart,
                     duration: 4,
                     row: 0,
-                    color: '#6366f1'
+                    epic: epics.length > 0 ? epics[0].id : ''
                 };
                 setTasks([...tasks, newTask]);
                 setEditingTaskId(newId);
@@ -328,14 +352,28 @@
                 setTasks(tasks.map(t => t.id === id ? { ...t, name } : t));
             };
 
-            const updateTaskColor = (id, color) => {
-                setTasks(tasks.map(t => t.id === id ? { ...t, color } : t));
+            const updateTaskEpic = (id, epic) => {
+                setTasks(tasks.map(t => t.id === id ? { ...t, epic } : t));
+            };
+
+            const getTaskColor = (task) => {
+                if (!task.epic) return '#4b5563'; // Dark gray for none
+                const epic = epics.find(e => e.id === task.epic);
+                return epic ? epic.color : '#4b5563';
             };
 
             const updateRowLabel = (idx, label) => {
                 const newLabels = [...rowLabels];
                 newLabels[idx] = label;
                 setRowLabels(newLabels);
+            };
+
+            const updateEpicName = (id, name) => {
+                setEpics(epics.map(e => e.id === id ? { ...e, name } : e));
+            };
+
+            const updateEpicColor = (id, color) => {
+                setEpics(epics.map(e => e.id === id ? { ...e, color } : e));
             };
 
             const startSidebarResize = (e) => {
@@ -664,7 +702,7 @@
                                     return html`
                                         <div key=${task.id} data-task-id=${task.id} onMouseDown=${(e) => onMouseDown(e, task)}
                                             class="absolute task-bar group rounded-lg border border-black/10 flex flex-col justify-center px-3 text-white shadow-sm ${isDragging ? 'opacity-30 z-0' : 'hover:shadow-lg'}"
-                                            style="left: ${displayTask.start * dayWidth + 2}px; top: ${displayTask.row * ROW_HEIGHT + 10}px; width: ${displayTask.duration * dayWidth - 4}px; height: 42px; background-color: ${displayTask.color}; pointer-events: ${isDragging && dragInfo.current.mode === 'move' ? 'none' : 'auto'}; opacity: ${isPastCompleted ? 0.7 : 1};">
+                                            style="left: ${displayTask.start * dayWidth + 2}px; top: ${displayTask.row * ROW_HEIGHT + 10}px; width: ${displayTask.duration * dayWidth - 4}px; height: 42px; background-color: ${getTaskColor(displayTask)}; pointer-events: ${isDragging && dragInfo.current.mode === 'move' ? 'none' : 'auto'}; opacity: ${isPastCompleted ? 0.7 : 1};">
                                             
                                             <div class="resize-handle-l"></div>
                                             <div class="resize-handle-r"></div>
@@ -680,13 +718,15 @@
                                                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
                                                         </button>
                                                         <div class="h-4 w-px bg-slate-200"></div>
-                                                        <input 
-                                                            type="color" 
-                                                            class="native-color-picker" 
-                                                            value=${task.color} 
-                                                            onInput=${(e) => updateTaskColor(task.id, e.target.value)} 
-                                                            title="Pick Task Color"
-                                                        />
+                                                        <select
+                                                            class="px-2 py-1 text-xs border border-slate-300 rounded bg-white text-slate-900"
+                                                            value=${task.epic}
+                                                            onChange=${(e) => updateTaskEpic(task.id, e.target.value)}
+                                                            title="Select Epic"
+                                                        >
+                                                            <option value="">None</option>
+                                                            ${epics.map(epic => html`<option value=${epic.id}>${epic.name}</option>`)}
+                                                        </select>
                                                     </div>
                                                 `
                                                 : html`
@@ -708,6 +748,56 @@
                                                 </div>`}
                                         </div>`;
                                 })}
+                            </div>
+                        </div>
+
+                        <!-- Legend -->
+                        <div class="absolute bottom-4 right-4 bg-white border border-slate-200 shadow-xl rounded-lg p-3 z-40 max-w-xs">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-sm font-bold text-slate-700">Epics</h3>
+                                <button onClick=${() => {
+                                    const newEpic = {
+                                        id: `epic${Date.now()}`,
+                                        name: 'New Epic',
+                                        color: '#6366f1'
+                                    };
+                                    setEpics([...epics, newEpic]);
+                                }} class="text-indigo-600 hover:text-indigo-800 text-sm font-bold">+</button>
+                            </div>
+                            <div class="space-y-1 max-h-48 overflow-y-auto">
+                                ${epics.map(epic => html`
+                                    <div key=${epic.id} class="flex items-center gap-2 group">
+                                        <input
+                                            type="color"
+                                            value=${epic.color}
+                                            onInput=${(e) => updateEpicColor(epic.id, e.target.value)}
+                                            class="w-6 h-6 rounded border border-slate-300 cursor-pointer"
+                                            title="Change epic color"
+                                        />
+                                        ${editingEpicId === epic.id
+                                            ? html`<input
+                                                autoFocus
+                                                class="text-xs border border-slate-300 rounded px-1 py-0.5 flex-1 min-w-0"
+                                                value=${epic.name}
+                                                onInput=${(e) => updateEpicName(epic.id, e.target.value)}
+                                                onKeyDown=${(e) => e.key === 'Enter' && setEditingEpicId(null)}
+                                                onBlur=${() => setEditingEpicId(null)}
+                                            />`
+                                            : html`<span
+                                                class="text-xs font-medium text-slate-700 flex-1 truncate cursor-pointer"
+                                                onClick=${() => setEditingEpicId(epic.id)}
+                                                title="Click to edit epic name"
+                                            >${epic.name}</span>`
+                                        }
+                                        <button onClick=${() => {
+                                            if (confirm('Delete this epic? Tasks using it will become "None".')) {
+                                                setEpics(epics.filter(e => e.id !== epic.id));
+                                                setTasks(tasks.map(t => t.epic === epic.id ? { ...t, epic: '' } : t));
+                                            }
+                                        }} class="opacity-0 group-hover:opacity-100 text-rose-500 hover:text-rose-700 text-xs">×</button>
+                                    </div>
+                                `)}
+                                ${epics.length === 0 && html`<div class="text-xs text-slate-500 italic">No epics yet</div>`}
                             </div>
                         </div>
                     </div>

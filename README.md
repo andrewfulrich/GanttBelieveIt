@@ -8,6 +8,8 @@ Check it out at https://andrewfulrich.github.io/GanttBelieveIt/
 
 - **Drag & Drop Tasks**: Easily move and resize tasks on the timeline
 - **Multiple Swimlanes**: Organize tasks into different categories or teams
+- **Epic-Based Colors**: Group tasks by epics with shared colors instead of individual task colors
+- **Interactive Legend**: Manage epics with color pickers and inline name editing
 - **Zoom Controls**: Adjust timeline zoom from 40% to 250%
 - **Import/Export**: Save and load project data as JSON files
 - **Local Storage**: Automatic saving to your browser's local storage
@@ -51,12 +53,27 @@ Then visit `http://localhost:3000`
 ## Usage
 
 1. **Add Tasks**: Click the "+ Add Task" button
-2. **Edit Tasks**: Click on any task to rename it or change its color
+2. **Edit Tasks**: Click on any task to rename it or assign it to an epic
 3. **Move Tasks**: Drag the middle of a task bar to reposition
 4. **Resize Tasks**: Drag the edges of a task bar to change duration
 5. **Add Swimlanes**: Use the "+ Add Swimlane" button to create new categories
-6. **Zoom**: Use the zoom controls in the header
-7. **Import/Export**: Use the buttons to save/load project data
+6. **Manage Epics**: Use the legend in the bottom-right to add, edit, and delete epics
+7. **Customize Colors**: Click epic color swatches in the legend to change colors
+8. **Edit Epic Names**: Click epic names in the legend to rename them
+9. **Zoom**: Use the zoom controls in the header
+10. **Import/Export**: Use the buttons to save/load project data
+
+## Epic Management
+
+Epics allow you to group related tasks and assign them consistent colors:
+
+- **Legend**: Located in the bottom-right corner of the interface
+- **Add Epics**: Click the "+" button in the legend to create new epics
+- **Edit Colors**: Click the color swatch next to any epic to change its color
+- **Edit Names**: Click on an epic name to rename it inline
+- **Delete Epics**: Hover over an epic and click the "×" button to delete it
+- **Task Assignment**: When editing a task, use the dropdown to assign it to an epic
+- **Default Color**: Tasks without an epic assignment use a dark gray color
 
 ## Data Format
 
@@ -71,10 +88,21 @@ Projects are stored as JSON with this schema:
       "start": "number",
       "duration": "number",
       "row": "number",
+      "epic": "string"
+    }
+  ],
+  "rowLabels": ["string"],
+  "epics": [
+    {
+      "id": "string",
+      "name": "string",
       "color": "string"
     }
   ],
-  "rowLabels": ["string"]
+  "settings": {
+    "showTitles": "boolean",
+    "projectStartDate": "string"
+  }
 }
 ```
 
