@@ -113,7 +113,7 @@
 
         const DAY_WIDTH_BASE = 40;
         const ROW_HEIGHT = 60;
-        const STORAGE_KEY = 'gantt-believe-it-data-v10';
+        const STORAGE_KEY = 'gantt-believe-it-data-v11';
 
         const JSON_SCHEMA = {
             "$schema": "http://json-schema.org/draft-07/schema#",
@@ -129,16 +129,16 @@
                             "start": { "type": "number" },
                             "duration": { "type": "number" },
                             "row": { "type": "number" },
-                            "epic": { "type": "string", "description": "Epic ID or empty string for none" }
+                            "colorLabel": { "type": "string", "description": "ColorLabel ID or empty string for none" }
                         },
-                        "required": ["id", "name", "start", "duration", "row", "epic"]
+            "required": ["id", "name", "start", "duration", "row", "colorLabel"]
                     }
                 },
                 "rowLabels": {
                     "type": "array",
                     "items": { "type": "string" }
                 },
-                "epics": {
+                "colorLabels": {
                     "type": "array",
                     "items": {
                         "type": "object",
@@ -159,19 +159,19 @@
                     "required": ["showTitles", "projectStartDate"]
                 }
             },
-            "required": ["tasks", "rowLabels", "epics", "settings"]
+            "required": ["tasks", "rowLabels", "colorLabels", "settings"]
         };
 
-        const initialEpics = [
-            { id: 'epic1', name: 'Planning', color: '#6366f1' },
-            { id: 'epic2', name: 'Design', color: '#10b981' },
-            { id: 'epic3', name: 'Testing', color: '#f59e0b' },
+        const initialColorLabels = [
+            { id: 'colorLabel1', name: 'Planning', color: '#6366f1' },
+            { id: 'colorLabel2', name: 'Design', color: '#10b981' },
+            { id: 'colorLabel3', name: 'Testing', color: '#f59e0b' },
         ];
 
         const initialTasks = [
-            { id: '1', name: 'Planning Phase', start: 2, duration: 5, row: 0, epic: 'epic1' },
-            { id: '2', name: 'Design Concepts', start: 8, duration: 4, row: 1, epic: 'epic2' },
-            { id: '3', name: 'Testing Phase', start: 10, duration: 3, row: 0, epic: 'epic3' },
+            { id: '1', name: 'Planning Phase', start: 2, duration: 5, row: 0, colorLabel: 'colorLabel1' },
+            { id: '2', name: 'Design Concepts', start: 8, duration: 4, row: 1, colorLabel: 'colorLabel2' },
+            { id: '3', name: 'Testing Phase', start: 10, duration: 3, row: 0, colorLabel: 'colorLabel3' },
         ];
 
         const initialRowLabels = ["Strategic Planning", "UX Design"];
@@ -187,9 +187,9 @@
                 const saved = localStorage.getItem(STORAGE_KEY);
                 return saved ? JSON.parse(saved).rowLabels : initialRowLabels;
             });
-            const [epics, setEpics] = useState(() => {
+            const [colorLabels, setColorLabels] = useState(() => {
                 const saved = localStorage.getItem(STORAGE_KEY);
-                return saved ? JSON.parse(saved).epics : initialEpics;
+                return saved ? JSON.parse(saved).colorLabels : initialColorLabels;
             });
             const [settings, setSettings] = useState(() => {
                 const saved = localStorage.getItem(STORAGE_KEY);
@@ -218,7 +218,7 @@
             const [gapAfterTaskId, setGapAfterTaskId] = useState(null);
             const [gapDays, setGapDays] = useState(1);
             const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-            const [editingEpicId, setEditingEpicId] = useState(null);
+            const [editingColorLabelId, setEditingColorLabelId] = useState(null);
             const [confirmPivot, setConfirmPivot] = useState(false);
             
             const dayWidth = DAY_WIDTH_BASE * zoom;
@@ -234,8 +234,8 @@
             });
 
             useEffect(() => {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, rowLabels, epics, settings }));
-            }, [tasks, rowLabels, epics, settings]);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, rowLabels, colorLabels, settings }));
+            }, [tasks, rowLabels, colorLabels, settings]);
 
             useEffect(() => {
                 localStorage.setItem('gantt-sidebar-width', sidebarWidth.toString());
@@ -266,7 +266,7 @@
             }, [editingTaskId, editingRowIdx, swimlaneMenuOpen, swimlaneInfoOpen, confirmRemoveGaps]);
 
             const exportData = () => {
-                const data = JSON.stringify({ tasks, rowLabels, epics, settings }, null, 2);
+                const data = JSON.stringify({ tasks, rowLabels, colorLabels, settings }, null, 2);
                 const blob = new Blob([data], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -283,10 +283,10 @@
                 reader.onload = (event) => {
                     try {
                         const json = JSON.parse(event.target.result);
-                        if (json.tasks && json.rowLabels && json.epics && json.settings) {
+                        if (json.tasks && json.rowLabels && json.colorLabels && json.settings) {
                             setTasks(json.tasks);
                             setRowLabels(json.rowLabels);
-                            setEpics(json.epics);
+                            setColorLabels(json.colorLabels);
                             setSettings(json.settings);
                         }
                     } catch (err) { console.error(err); }
@@ -407,7 +407,7 @@
                     start: newStart,
                     duration: 4,
                     row: 0,
-                    epic: epics.length > 0 ? epics[0].id : ''
+                    colorLabel: colorLabels.length > 0 ? colorLabels[0].id : ''
                 };
                 setTasks([...tasks, newTask]);
                 setEditingTaskId(newId);
@@ -427,14 +427,14 @@
                 setEditingTaskId(newId); // Update the editing state to the new ID
             };
 
-            const updateTaskEpic = (id, epic) => {
-                setTasks(tasks.map(t => t.id === id ? { ...t, epic } : t));
+            const updateTaskColorLabel = (id, colorLabel) => {
+                setTasks(tasks.map(t => t.id === id ? { ...t, colorLabel } : t));
             };
 
             const getTaskColor = (task) => {
-                if (!task.epic) return '#4b5563'; // Dark gray for none
-                const epic = epics.find(e => e.id === task.epic);
-                return epic ? epic.color : '#4b5563';
+                if (!task.colorLabel) return '#4b5563'; // Dark gray for none
+                const colorLabel = colorLabels.find(e => e.id === task.colorLabel);
+                return colorLabel ? colorLabel.color : '#4b5563';
             };
 
             const updateRowLabel = (idx, label) => {
@@ -443,12 +443,12 @@
                 setRowLabels(newLabels);
             };
 
-            const updateEpicName = (id, name) => {
-                setEpics(epics.map(e => e.id === id ? { ...e, name } : e));
+            const updateColorLabelName = (id, name) => {
+                setColorLabels(colorLabels.map(e => e.id === id ? { ...e, name } : e));
             };
 
-            const updateEpicColor = (id, color) => {
-                setEpics(epics.map(e => e.id === id ? { ...e, color } : e));
+            const updateColorLabelColor = (id, color) => {
+                setColorLabels(colorLabels.map(e => e.id === id ? { ...e, color } : e));
             };
 
             const startSidebarResize = (e) => {
@@ -715,13 +715,13 @@
 
             const applyPivot = () => {
                 // Transform
-                const newRowLabels = epics.map(e => e.name);
-                const newEpics = rowLabels.map((label, i) => ({ id: `swimlane${i}`, name: label, color: epics[i % epics.length]?.color || '#64748b' }));
+                const newRowLabels = colorLabels.map(e => e.name);
+                const newColorLabels = rowLabels.map((label, i) => ({ id: `swimlane${i}`, name: label, color: colorLabels[i % colorLabels.length]?.color || '#64748b' }));
                 const newTasks = tasks.map(task => {
-                    const oldEpic = epics.find(e => e.id === task.epic);
-                    const newRow = oldEpic ? epics.indexOf(oldEpic) : 0;
-                    const newEpic = `swimlane${task.row}`;
-                    return { ...task, row: newRow, epic: newEpic };
+                    const oldColorLabel = colorLabels.find(e => e.id === task.colorLabel);
+                    const newRow = oldColorLabel ? colorLabels.indexOf(oldColorLabel) : 0;
+                    const newColorLabel = `swimlane${task.row}`;
+                    return { ...task, row: newRow, colorLabel: newColorLabel };
                 });
 
                 // Sort swimlanes by earliest task start date
@@ -735,7 +735,7 @@
 
                 setTasks(sortedTasks);
                 setRowLabels(sortedRowLabels);
-                setEpics(newEpics);
+                setColorLabels(newColorLabels);
             };
 
             return html`
@@ -880,12 +880,12 @@
                                                         <div class="h-4 w-px bg-slate-200"></div>
                                                         <select
                                                             class="px-2 py-1 text-xs border border-slate-300 rounded bg-white text-slate-900"
-                                                            value=${task.epic}
-                                                            onChange=${(e) => updateTaskEpic(task.id, e.target.value)}
-                                                            title="Select Epic"
+                                                            value=${task.colorLabel}
+                                                            onChange=${(e) => updateTaskColorLabel(task.id, e.target.value)}
+                                                            title="Select ColorLabel"
                                                         >
                                                             <option value="">None</option>
-                                                            ${epics.map(epic => html`<option value=${epic.id}>${epic.name}</option>`)}
+                                                            ${colorLabels.map(colorLabel => html`<option value=${colorLabel.id}>${colorLabel.name}</option>`)}
                                                         </select>
                                                     </div>
                                                 `
@@ -914,50 +914,50 @@
                         <!-- Legend -->
                         <div class="fixed bottom-20 right-4 bg-white border border-slate-200 shadow-xl rounded-lg p-3 z-40 max-w-xs">
                             <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-sm font-bold text-slate-700">Epics</h3>
+                                <h3 class="text-sm font-bold text-slate-700">Color Labels</h3>
                                 <button onClick=${() => {
-                                    const newEpic = {
-                                        id: `epic${Date.now()}`,
-                                        name: 'New Epic',
+                                    const newColorLabel = {
+                                        id: `colorLabel${Date.now()}`,
+                                        name: 'New Color Label',
                                         color: '#6366f1'
                                     };
-                                    setEpics([...epics, newEpic]);
+                                    setColorLabels([...colorLabels, newColorLabel]);
                                 }} class="text-indigo-600 hover:text-indigo-800 text-sm font-bold">+</button>
                             </div>
                             <div class="space-y-1 max-h-48 overflow-y-auto">
-                                ${epics.map(epic => html`
-                                    <div key=${epic.id} class="flex items-center gap-2 group">
+                                ${colorLabels.map(colorLabel => html`
+                                    <div key=${colorLabel.id} class="flex items-center gap-2 group">
                                         <input
                                             type="color"
-                                            value=${epic.color}
-                                            onInput=${(e) => updateEpicColor(epic.id, e.target.value)}
+                                            value=${colorLabel.color}
+                                            onInput=${(e) => updateColorLabelColor(colorLabel.id, e.target.value)}
                                             class="w-6 h-6 rounded border border-slate-300 cursor-pointer"
-                                            title="Change epic color"
+                                            title="Change color label color"
                                         />
-                                        ${editingEpicId === epic.id
+                                        ${editingColorLabelId === colorLabel.id
                                             ? html`<input
                                                 autoFocus
                                                 class="text-xs border border-slate-300 rounded px-1 py-0.5 flex-1 min-w-0"
-                                                value=${epic.name}
-                                                onInput=${(e) => updateEpicName(epic.id, e.target.value)}
-                                                onKeyDown=${(e) => e.key === 'Enter' && setEditingEpicId(null)}
-                                                onBlur=${() => setEditingEpicId(null)}
+                                                value=${colorLabel.name}
+                                                onInput=${(e) => updateColorLabelName(colorLabel.id, e.target.value)}
+                                                onKeyDown=${(e) => e.key === 'Enter' && setEditingColorLabelId(null)}
+                                                onBlur=${() => setEditingColorLabelId(null)}
                                             />`
                                             : html`<span
                                                 class="text-xs font-medium text-slate-700 flex-1 truncate cursor-pointer"
-                                                onClick=${() => setEditingEpicId(epic.id)}
-                                                title="Click to edit epic name"
-                                            >${epic.name}</span>`
+                                                onClick=${() => setEditingColorLabelId(colorLabel.id)}
+                                                title="Click to edit color label name"
+                                            >${colorLabel.name}</span>`
                                         }
                                         <button onClick=${() => {
-                                            if (confirm('Delete this epic? Tasks using it will become "None".')) {
-                                                setEpics(epics.filter(e => e.id !== epic.id));
-                                                setTasks(tasks.map(t => t.epic === epic.id ? { ...t, epic: '' } : t));
+                                            if (confirm('Delete this color label? Tasks using it will become "None".')) {
+                                                setColorLabels(colorLabels.filter(e => e.id !== colorLabel.id));
+                                                setTasks(tasks.map(t => t.colorLabel === colorLabel.id ? { ...t, colorLabel: '' } : t));
                                             }
                                         }} class="opacity-0 group-hover:opacity-100 text-rose-500 hover:text-rose-700 text-xs">×</button>
                                     </div>
                                 `)}
-                                ${epics.length === 0 && html`<div class="text-xs text-slate-500 italic">No epics yet</div>`}
+                                ${colorLabels.length === 0 && html`<div class="text-xs text-slate-500 italic">No color labels yet</div>`}
                             </div>
                         </div>
                     </div>
@@ -987,7 +987,7 @@
                                             <li><span class="font-bold">Move:</span> Drag the middle of a task bar.</li>
                                             <li><span class="font-bold">Resize:</span> Drag the left or right edge of a task bar.</li>
                                             <li><span class="font-bold">Reorder Swimlanes:</span> Drag swimlane labels in the sidebar to reorder them.</li>
-                                            <li><span class="font-bold">Pivot View:</span> Click the "Pivot" button to convert epics to swimlanes and swimlanes to epics.</li>
+                                            <li><span class="font-bold">Pivot View:</span> Click the "Pivot" button to convert color labels to swimlanes and swimlanes to color labels.</li>
                                             <li><span class="font-bold">Minimum Size:</span> Tasks cannot be smaller than 1 day.</li>
                                             <li><span class="font-bold">Collision:</span> Rescheduling pushes subsequent tasks to prevent overlap.</li>
                                             <li><span class="font-bold">Management:</span> Add swimlanes or tasks, and click items to edit names.</li>
@@ -1154,7 +1154,7 @@ ${JSON.stringify(JSON_SCHEMA, null, 2)}
                                 </div>
                                 <div class="p-6 space-y-4">
                                     <p class="text-sm text-slate-600">
-                                        This action will convert epics to swimlanes and swimlanes to epics.
+                                        This action will convert color labels to swimlanes and swimlanes to color labels.
                                     </p>
                                     <p class="text-sm text-slate-600">
                                         It is recommended to export your data first to preserve the current state.

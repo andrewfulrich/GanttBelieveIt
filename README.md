@@ -8,9 +8,9 @@ Check it out at https://andrewfulrich.github.io/GanttBelieveIt/
 
 - **Drag & Drop Tasks**: Easily move and resize tasks on the timeline
 - **Multiple Swimlanes**: Organize tasks into different categories or teams
-- **Epic-Based Colors**: Group tasks by epics with shared colors instead of individual task colors
-- **Interactive Legend**: Manage epics with color pickers and inline name editing
-- **Pivot View**: Switch between viewing epics as swimlanes and swimlanes as epics
+- **Color Labels**: Color-code your tasks
+- **Interactive Legend**: Manage color labels with color pickers and inline name editing
+- **Pivot View**: Switch between viewing color labels as swimlanes and swimlanes as color labels
 - **Zoom Controls**: Adjust timeline zoom from 40% to 250%
 - **Import/Export**: Save and load project data as JSON files
 - **Local Storage**: Automatic saving to your browser's local storage
@@ -54,28 +54,28 @@ Then visit `http://localhost:3000`
 ## Usage
 
 1. **Add Tasks**: Click the "+ Add Task" button
-2. **Edit Tasks**: Click on any task to rename it or assign it to an epic
+2. **Edit Tasks**: Click on any task to rename it or assign it to a color label
 3. **Move Tasks**: Drag the middle of a task bar to reposition
 4. **Resize Tasks**: Drag the edges of a task bar to change duration
 5. **Add Swimlanes**: Use the "+ Add Swimlane" button to create new categories
-6. **Manage Epics**: Use the legend in the bottom-right to add, edit, and delete epics
-7. **Customize Colors**: Click epic color swatches in the legend to change colors
-8. **Edit Epic Names**: Click epic names in the legend to rename them
-9. **Pivot View**: Click the "Pivot" button to switch between viewing epics as swimlanes and swimlanes as epics
+6. **Manage Color Labels**: Use the legend in the bottom-right to add, edit, and delete color labels
+7. **Customize Colors**: Click color label color swatches in the legend to change colors
+8. **Edit Color Label Names**: Click color label names in the legend to rename them
+9. **Pivot View**: Click the "Pivot" button to switch between viewing color labels as swimlanes and swimlanes as color labels
 10. **Zoom**: Use the zoom controls in the header
 11. **Import/Export**: Use the buttons to save/load project data
 
-## Epic Management
+## Color Label Management
 
-Epics allow you to group related tasks and assign them consistent colors:
+Color Labels allow you to group related tasks and assign them consistent colors:
 
 - **Legend**: Located in the bottom-right corner of the interface
-- **Add Epics**: Click the "+" button in the legend to create new epics
-- **Edit Colors**: Click the color swatch next to any epic to change its color
-- **Edit Names**: Click on an epic name to rename it inline
-- **Delete Epics**: Hover over an epic and click the "×" button to delete it
-- **Task Assignment**: When editing a task, use the dropdown to assign it to an epic
-- **Default Color**: Tasks without an epic assignment use a dark gray color
+- **Add Color Labels**: Click the "+" button in the legend to create new color labels
+- **Edit Colors**: Click the color swatch next to any color label to change its color
+- **Edit Names**: Click on a color label name to rename it inline
+- **Delete Color Labels**: Hover over a color label and click the "×" button to delete it
+- **Task Assignment**: When editing a task, use the dropdown to assign it to a color label
+- **Default Color**: Tasks without a color label assignment use a dark gray color
 
 ## Data Format
 
@@ -94,7 +94,7 @@ Projects are stored as JSON with this schema:
     }
   ],
   "rowLabels": ["string"],
-  "epics": [
+  "colorLabels": [
     {
       "id": "string",
       "name": "string",
