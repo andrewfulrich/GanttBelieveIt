@@ -672,9 +672,20 @@
                     const newEpic = `swimlane${task.row}`;
                     return { ...task, row: newRow, epic: newEpic };
                 });
-                setTasks(newTasks);
-                setRowLabels(newRowLabels);
-                setEpics(newEpics);
+
+                // Sort swimlanes by earliest task start date
+                const rowMinStarts = newRowLabels.map((_, i) => {
+                    const tasksInRow = newTasks.filter(t => t.row === i);
+                    return tasksInRow.length > 0 ? Math.min(...tasksInRow.map(t => t.start)) : Infinity;
+                });
+                const sortedIndices = rowMinStarts.map((_, i) => i).sort((a, b) => rowMinStarts[a] - rowMinStarts[b]);
+                const sortedRowLabels = sortedIndices.map(i => newRowLabels[i]);
+                const sortedEpics = sortedIndices.map(i => newEpics[i]);
+                const sortedTasks = newTasks.map(task => ({ ...task, row: sortedIndices.indexOf(task.row) }));
+
+                setTasks(sortedTasks);
+                setRowLabels(sortedRowLabels);
+                setEpics(sortedEpics);
             };
 
             return html`
