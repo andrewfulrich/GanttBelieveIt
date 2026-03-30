@@ -798,9 +798,10 @@
                                     };
                                     const nameWidth = measureTextWidth(task.name, 14, 'bold');
                                     const infoWidth = measureTextWidth(`ID: ${task.id}, Days: ${task.duration}`, 12, '500');
+                                    const idWidth = measureTextWidth(`ID: ${task.id}`, 12, '500');
                                     const labelWidth = Math.max(nameWidth, infoWidth);
                                     const taskWidth = displayTask.duration * dayWidth - 4;
-                                    const shouldRotate = labelWidth > taskWidth && hasNextTask;
+                                    const shouldRotate = idWidth > taskWidth && hasNextTask;
                                     
                                     const isPastCompleted = currentDay >= 0 && displayTask.start + displayTask.duration <= currentDay;
                                     return html`
