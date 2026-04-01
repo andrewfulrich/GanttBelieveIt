@@ -221,7 +221,8 @@
             const [isSettingsOpen, setIsSettingsOpen] = useState(false);
             const [editingColorLabelId, setEditingColorLabelId] = useState(null);
             const [confirmPivot, setConfirmPivot] = useState(false);
-            const [scrollToTaskId, setScrollToTaskId] = useState(null);
+            const [taskJustAdded, setTaskJustAdded] = useState(false);
+            const [editingTaskIdValue, setEditingTaskIdValue] = useState(null);
             
             const dayWidth = DAY_WIDTH_BASE * zoom;
             const containerRef = useRef(null);
@@ -251,6 +252,7 @@
                         if (!isTaskElement && !isToolbar) {
                             setEditingTaskId(null);
                             setConfirmDeleteId(null);
+                            setEditingTaskIdValue(null);
                         }
                     }
                     if (editingRowIdx !== null) {
@@ -268,14 +270,19 @@
             }, [editingTaskId, editingRowIdx, swimlaneMenuOpen, swimlaneInfoOpen, confirmRemoveGaps]);
 
             useEffect(() => {
-                if (scrollToTaskId) {
-                    const element = document.getElementById(scrollToTaskId);
-                    if (element) {
-                        element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-                    }
-                    setScrollToTaskId(null);
+                if (taskJustAdded) {
+                    console.log('just added')
+                    setTimeout(() => {
+                        const element = document.getElementById(editingTaskId);
+                        console.log('scrolling')
+                        if (element) {
+                            element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                        }
+                        setTaskJustAdded(false);
+                        console.log('setting to false')
+                    }, 0);
                 }
-            }, [scrollToTaskId]);
+            }, [taskJustAdded, editingTaskId]);
 
             const exportData = () => {
                 const data = JSON.stringify({ tasks, rowLabels, colorLabels, settings }, null, 2);
@@ -423,7 +430,8 @@
                 };
                 setTasks([...tasks, newTask]);
                 setEditingTaskId(newId);
-                setScrollToTaskId(newId);
+                setEditingTaskIdValue(newId);
+                setTaskJustAdded(true);
             };
 
             const updateTaskName = (id, name) => {
@@ -437,7 +445,7 @@
                     return;
                 }
                 setTasks(tasks.map(t => t.id === oldId ? { ...t, id: newId } : t));
-                setEditingTaskId(newId); // Update the editing state to the new ID
+                setEditingTaskIdValue(null);
             };
 
             const updateTaskColorLabel = (id, colorLabel) => {
@@ -518,7 +526,10 @@
             const handleMouseUp = useCallback(() => {
                 if (dragInfo.current.task) {
                     if (dragInfo.current.hasMoved) finalizeMove(dragInfo.current.task);
-                    else setEditingTaskId(dragInfo.current.task.id);
+                    else {
+                        setEditingTaskId(dragInfo.current.task.id);
+                        setEditingTaskIdValue(dragInfo.current.task.id);
+                    }
                 }
                 dragInfo.current.task = null;
                 setDraggingTask(null);
@@ -834,7 +845,7 @@
                                             ${isEditing
                                                 ? html`
                                                     <div class="relative w-full h-full flex flex-col items-center justify-center gap-1">
-                                                        <input autoFocus onFocus=${e => e.target.select()} class="editable-input text-xs" value=${task.id} onInput=${(e) => updateTaskId(task.id, e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && setEditingTaskId(null)} placeholder="Task ID" />
+                                                        <input autoFocus onFocus=${e => e.target.select()} class="editable-input text-xs" value=${editingTaskIdValue || task.id} onInput=${(e) => setEditingTaskIdValue(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') { updateTaskId(task.id, editingTaskIdValue || task.id); setEditingTaskId(null); } }} onBlur=${() => { updateTaskId(task.id, editingTaskIdValue || task.id); setEditingTaskId(null); }} placeholder="Task ID" />
                                                         <input onFocus=${e => e.target.select()} class="editable-input text-xs" value=${task.name} onInput=${(e) => updateTaskName(task.id, e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && setEditingTaskId(null)} placeholder="Task Name" />
                                                     </div>
                                                     <!-- Edit Toolbar -->
