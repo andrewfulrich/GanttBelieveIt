@@ -73,13 +73,14 @@
             pointer-events: none;
             white-space: nowrap;
             /* Heavy centered shadow (glow effect) */
-            text-shadow: 
-                0 0 4px rgba(0,0,0,0.9), 
+            text-shadow:
+                0 0 4px rgba(0,0,0,0.9),
                 0 0 2px rgba(0,0,0,1),
                 0 0 1px rgba(0,0,0,1),
                 0 0 3px rgba(0,0,0,1),
                 0 0 8px rgba(0,0,0,0.4);
             color: white;
+            z-index: 999;
         }
 
         /* Styling the native color picker to look like a button */
@@ -470,55 +471,7 @@
 
             const finalizeMove = (movedTask) => {
                 setTasks(prevTasks => {
-                    let otherTasks = prevTasks.filter(t => t.id !== movedTask.id);
-                    let rowTasks = otherTasks.filter(t => t.row === movedTask.row).sort((a, b) => a.start - b.start);
-
-
-                    // Find the drop target (task B) - the task under the drop
-                    let targetIdx = rowTasks.findIndex(t =>
-                        movedTask.start >= t.start && movedTask.start < t.start + t.duration
-                    );
-                    let newStart;
-                    let insertAt;
-                    if (targetIdx !== -1) {
-                        // Dropped over a task: insert after it
-                        const target = rowTasks[targetIdx];
-                        newStart = target.start + target.duration;
-                        insertAt = targetIdx + 1;
-                    } else {
-                        // Not dropped over a task: find where to insert by start
-                        insertAt = rowTasks.findIndex(t => movedTask.start < t.start);
-                        if (insertAt === -1) {
-                            // Dropped after all tasks: use the drop position
-                            newStart = movedTask.start;
-                            insertAt = rowTasks.length;
-                        } else {
-                            // Dropped before the first task that starts after movedTask
-                            newStart = movedTask.start;
-                        }
-                    }
-
-                    // Insert movedTask at the correct place
-                    const updatedMovedTask = { ...movedTask, start: newStart };
-                    let newRowTasks = [...rowTasks];
-                    newRowTasks.splice(insertAt, 0, updatedMovedTask);
-
-                    // Now push all tasks in the row to the right as needed (no overlaps)
-                    for (let i = 1; i < newRowTasks.length; i++) {
-                        const prev = newRowTasks[i - 1];
-                        if (newRowTasks[i].start < prev.start + prev.duration) {
-                            newRowTasks[i].start = prev.start + prev.duration;
-                        }
-                    }
-
-                    // Merge back with otherTasks (not in this row)
-                    let newTaskList = [
-                        ...otherTasks.filter(t => t.row !== movedTask.row),
-                        ...newRowTasks
-                    ];
-                    // Sort for display
-                    newTaskList.sort((a, b) => (a.row !== b.row) ? a.row - b.row : a.start - b.start);
-                    return [...newTaskList];
+                    return prevTasks.map(t => t.id === movedTask.id ? { ...movedTask } : t);
                 });
             };
 
@@ -770,7 +723,7 @@
                     </header>
 
                     <div class="flex-1 flex overflow-visible relative" ref=${containerRef}>
-                        <div class="bg-white border-r flex-shrink-0 flex flex-col shadow-xl relative" style="position: sticky; left: 0; z-index: 1001; width: ${sidebarWidth}px;">
+                        <div class="bg-white border-r flex-shrink-0 flex flex-col shadow-xl relative" style="position: sticky; left: 0; z-index: 12000; width: ${sidebarWidth}px;">
                             <div class="h-12 border-b bg-slate-50 flex items-center px-4 text-[12px] font-black text-slate-400 uppercase tracking-widest">Swimlanes</div>
                             <div class="flex-1 overflow-y-auto overflow-x-hidden relative">
                                 <div onMouseDown=${startSidebarResize} class="absolute right-0 top-0 bottom-0 w-4 bg-gray-100 cursor-ew-resize z-10"></div>
@@ -861,7 +814,7 @@
                                     return html`
                                         <div key=${task.id} data-task-id=${task.id} onMouseDown=${(e) => onMouseDown(e, task)}
                                             class="absolute task-bar group rounded-lg border border-black/10 flex flex-col justify-center px-3 text-white shadow-sm ${isDragging ? 'opacity-30 z-0' : 'hover:shadow-lg'}"
-                                            style="left: ${displayTask.start * dayWidth + 2}px; top: ${displayTask.row * ROW_HEIGHT + 10}px; width: ${displayTask.duration * dayWidth - 4}px; height: 42px; background-color: ${getTaskColor(displayTask)}; pointer-events: ${isDragging && dragInfo.current.mode === 'move' ? 'none' : 'auto'};">
+                                            style="left: ${displayTask.start * dayWidth + 2}px; top: ${displayTask.row * ROW_HEIGHT + 10}px; width: ${displayTask.duration * dayWidth - 4}px; height: 42px; background-color: ${getTaskColor(displayTask)}; pointer-events: ${isDragging && dragInfo.current.mode === 'move' ? 'none' : 'auto'}; z-index: ${Math.max(1000, 11000 - displayTask.duration)};">
                                             <div class="absolute bg-slate-300/50" style="left: 0px; width:100%; height:100%; ${isPastCompleted ?  '' : 'display: none;'};"></div>
                                             <div class="resize-handle-l"></div>
                                             <div class="resize-handle-r"></div>
@@ -891,7 +844,7 @@
                                                 `
                                                 : html`
                                                     <div class="task-label-container">
-                                                        <div class="text-[12px] font-medium opacity-80 leading-tight" style=${shouldRotate ? 'transform: rotate(-30deg) translateX(0); transform-origin: left center; z-index: 1000;' : ''}>
+                                                        <div class="text-[12px] font-medium opacity-80 leading-tight" style=${shouldRotate ? 'transform: rotate(-30deg) translateX(0); transform-origin: left center; z-index: 999;' : ''}>
                                                             ID: ${task.id}
                                                         </div>
                                                         <div class="text-sm font-bold leading-tight" style=${!settings.showTitles ? 'display: none;' : ''}>${task.name}</div>
@@ -974,7 +927,7 @@
                     </footer>
 
                     ${isHelpOpen && html`
-                        <div class="fixed inset-0 z-[1100] flex items-center justify-center p-6 modal-overlay" onClick=${() => setIsHelpOpen(false)}>
+                        <div class="fixed inset-0 z-[13000] flex items-center justify-center p-6 modal-overlay" onClick=${() => setIsHelpOpen(false)}>
                             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" onClick=${e => e.stopPropagation()}>
                                 <div class="px-6 py-4 border-b flex justify-between items-center bg-slate-50">
                                     <h2 class="text-lg font-bold text-slate-900">User Guide & JSON Schema</h2>
@@ -989,7 +942,7 @@
                                             <li><span class="font-bold">Reorder Swimlanes:</span> Drag swimlane labels in the sidebar to reorder them.</li>
                                             <li><span class="font-bold">Pivot View:</span> Click the "Pivot" button to convert color labels to swimlanes and swimlanes to color labels.</li>
                                             <li><span class="font-bold">Minimum Size:</span> Tasks cannot be smaller than 1 day.</li>
-                                            <li><span class="font-bold">Collision:</span> Rescheduling pushes subsequent tasks to prevent overlap.</li>
+                                            <li><span class="font-bold">Overlaps:</span> Tasks can now overlap, with smaller tasks appearing on top.</li>
                                             <li><span class="font-bold">Management:</span> Add swimlanes or tasks, and click items to edit names.</li>
                                         </ul>
                                     </section>
@@ -1038,7 +991,7 @@ ${JSON.stringify(JSON_SCHEMA, null, 2)}
                             emptyRanges.push(`${start}-${end}`);
                         }
                         return html`
-                            <div class="fixed inset-0 z-[1100] flex items-center justify-center p-6 modal-overlay" onClick=${() => setSwimlaneInfoOpen(null)}>
+                            <div class="fixed inset-0 z-[13000] flex items-center justify-center p-6 modal-overlay" onClick=${() => setSwimlaneInfoOpen(null)}>
                                 <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col" onClick=${e => e.stopPropagation()}>
                                     <div class="px-6 py-4 border-b flex justify-between items-center bg-slate-50">
                                         <h2 class="text-lg font-bold text-slate-900">Swimlane Info</h2>
@@ -1060,7 +1013,7 @@ ${JSON.stringify(JSON_SCHEMA, null, 2)}
                     })()}
 
                     ${confirmRemoveGaps !== null && html`
-                        <div class="fixed inset-0 z-[1100] flex items-center justify-center p-6 modal-overlay" onClick=${() => setConfirmRemoveGaps(null)}>
+                        <div class="fixed inset-0 z-[13000] flex items-center justify-center p-6 modal-overlay" onClick=${() => setConfirmRemoveGaps(null)}>
                             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col" onClick=${e => e.stopPropagation()}>
                                 <div class="px-6 py-4 border-b flex justify-between items-center bg-slate-50">
                                     <h2 class="text-lg font-bold text-slate-900">Confirm Action</h2>
@@ -1099,7 +1052,7 @@ ${JSON.stringify(JSON_SCHEMA, null, 2)}
                     ${createGapModal !== null && (() => {
                         const laneTasks = tasks.filter(t => t.row === createGapModal).sort((a,b)=>a.start-b.start);
                         return html`
-                            <div class="fixed inset-0 z-[1100] flex items-center justify-center p-6 modal-overlay" onClick=${() => setCreateGapModal(null)}>
+                            <div class="fixed inset-0 z-[13000] flex items-center justify-center p-6 modal-overlay" onClick=${() => setCreateGapModal(null)}>
                                 <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col" onClick=${e => e.stopPropagation()}>
                                     <div class="px-6 py-4 border-b flex justify-between items-center bg-slate-50">
                     <h2 class="text-lg font-bold text-slate-900">Push Tasks</h2>
@@ -1147,7 +1100,7 @@ ${JSON.stringify(JSON_SCHEMA, null, 2)}
                     })()}
 
                     ${confirmPivot && html`
-                        <div class="fixed inset-0 z-[1100] flex items-center justify-center p-6 modal-overlay" onClick=${() => setConfirmPivot(false)}>
+                        <div class="fixed inset-0 z-[13000] flex items-center justify-center p-6 modal-overlay" onClick=${() => setConfirmPivot(false)}>
                             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col" onClick=${e => e.stopPropagation()}>
                                 <div class="px-6 py-4 border-b flex justify-between items-center bg-slate-50">
                                     <h2 class="text-lg font-bold text-slate-900">Confirm Pivot</h2>
@@ -1176,7 +1129,7 @@ ${JSON.stringify(JSON_SCHEMA, null, 2)}
                     `}
 
                     ${isSettingsOpen && html`
-                        <div class="fixed inset-0 z-[1100] flex items-center justify-center p-6 modal-overlay" onClick=${() => setIsSettingsOpen(false)}>
+                        <div class="fixed inset-0 z-[13000] flex items-center justify-center p-6 modal-overlay" onClick=${() => setIsSettingsOpen(false)}>
                             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col" onClick=${e => e.stopPropagation()}>
                                 <div class="px-6 py-4 border-b flex justify-between items-center bg-slate-50">
                                     <h2 class="text-lg font-bold text-slate-900">Settings</h2>
