@@ -221,6 +221,7 @@
             const [isSettingsOpen, setIsSettingsOpen] = useState(false);
             const [editingColorLabelId, setEditingColorLabelId] = useState(null);
             const [confirmPivot, setConfirmPivot] = useState(false);
+            const [scrollToTaskId, setScrollToTaskId] = useState(null);
             
             const dayWidth = DAY_WIDTH_BASE * zoom;
             const containerRef = useRef(null);
@@ -265,6 +266,16 @@
                 window.addEventListener('mousedown', handleClickOutside);
                 return () => window.removeEventListener('mousedown', handleClickOutside);
             }, [editingTaskId, editingRowIdx, swimlaneMenuOpen, swimlaneInfoOpen, confirmRemoveGaps]);
+
+            useEffect(() => {
+                if (scrollToTaskId) {
+                    const element = document.getElementById(scrollToTaskId);
+                    if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                    }
+                    setScrollToTaskId(null);
+                }
+            }, [scrollToTaskId]);
 
             const exportData = () => {
                 const data = JSON.stringify({ tasks, rowLabels, colorLabels, settings }, null, 2);
@@ -412,6 +423,7 @@
                 };
                 setTasks([...tasks, newTask]);
                 setEditingTaskId(newId);
+                setScrollToTaskId(newId);
             };
 
             const updateTaskName = (id, name) => {
@@ -812,7 +824,7 @@
                                     
                                     const isPastCompleted = currentDay >= 0 && displayTask.start + displayTask.duration <= currentDay;
                                     return html`
-                                        <div key=${task.id} data-task-id=${task.id} onMouseDown=${(e) => onMouseDown(e, task)}
+                                        <div key=${task.id} id=${task.id} data-task-id=${task.id} onMouseDown=${(e) => onMouseDown(e, task)}
                                             class="absolute task-bar group rounded-lg border border-black/10 flex flex-col justify-center px-3 text-white shadow-sm ${isDragging ? 'opacity-30 z-0' : 'hover:shadow-lg'}"
                                             style="left: ${displayTask.start * dayWidth + 2}px; top: ${displayTask.row * ROW_HEIGHT + 10}px; width: ${displayTask.duration * dayWidth - 4}px; height: 42px; background-color: ${getTaskColor(displayTask)}; pointer-events: ${isDragging && dragInfo.current.mode === 'move' ? 'none' : 'auto'}; z-index: ${Math.max(1000, 11000 - displayTask.duration)};">
                                             <div class="absolute bg-slate-300/50" style="left: 0px; width:100%; height:100%; ${isPastCompleted ?  '' : 'display: none;'};"></div>
