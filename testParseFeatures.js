@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { parseFeatures } = require('./parseFeatures');
+const { parseFeatures } = require('./docs/parseFeatures');
 
 const csv = fs.readFileSync('data-with-start-dates.csv', 'utf8');
 const features = parseFeatures(csv);

@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { parseEpics } = require('./parseEpics');
+const { parseEpics } = require('./docs/parseEpics');
 
 const csv = fs.readFileSync('data-with-start-dates.csv', 'utf8');
 const epics = parseEpics(csv);
