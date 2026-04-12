@@ -1,3 +1,20 @@
+function parseDate(dateStr) {
+  if (!dateStr) return '';
+  // Check if it's MM/DD/YYYY format (possibly with time)
+  if (dateStr.includes('/')) {
+    const datePart = dateStr.split(' ')[0]; // Ignore time part
+    const parts = datePart.split('/');
+    if (parts.length === 3) {
+      const month = parts[0].padStart(2, '0');
+      const day = parts[1].padStart(2, '0');
+      const year = parts[2];
+      return `${year}-${month}-${day}`;
+    }
+  }
+  // Assume it's already in YYYY-MM-DD format
+  return dateStr;
+}
+
 function parseLine(line) {
   const fields = [];
   let current = '';
@@ -61,10 +78,10 @@ function parseEpics(csvString) {
       title: epic.Title,
       totalDays,
       percentageComplete: parseFloat(percentageComplete),
-      startDate: epic['Start Date']
+      startDate: parseDate(epic['Start Date'])
     });
   }
   return result;
 }
 
-export { parseEpics };
+module.exports = { parseEpics };
