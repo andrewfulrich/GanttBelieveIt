@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Epics Gantt Planner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+
+        .gantt-grid {
+            background-image:
+                linear-gradient(to right, #cbd5e1 1px, transparent 1px),
+                linear-gradient(to bottom, #cbd5e1 1px, transparent 1px);
+        }
+
+        .task-bar {
+            cursor: default;
+            touch-action: none;
+            user-select: none;
+            overflow: visible !important;
+        }
+
+        /* Resize Handles - removed for epics */
+
+        .editable-input {
+            background: white;
+            color: black;
+            border: none;
+            outline: 2px solid #4f46e5;
+            border-radius: 4px;
+            width: 100%;
+            min-width: 180px; /* Ensures input is usable even on 1-day tasks */
+            padding: 0 4px;
+            font-weight: inherit;
+            position: relative;
+            z-index: 60;
+        }
+
+        .delete-confirm-overlay {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(2px);
+        }
+
+        ::-webkit-scrollbar { width: 12px; height: 12px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 5px; border: 2px solid #f1f1f1; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .modal-overlay {
+            background-color: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        /* Label styling with heavy centered shadow for legibility */
+        .task-label-container {
+            position: absolute;
+            left: 12px;
+            right: -300px;
+            pointer-events: none;
+            white-space: nowrap;
+            /* Heavy centered shadow (glow effect) */
+            text-shadow:
+                0 0 4px rgba(0,0,0,0.9),
+                0 0 2px rgba(0,0,0,1),
+                0 0 1px rgba(0,0,0,1),
+                0 0 3px rgba(0,0,0,1),
+                0 0 8px rgba(0,0,0,0.4);
+            color: white;
+            z-index: 999;
+        }
+
+        /* Styling the native color picker to look like a button */
+        .native-color-picker {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            cursor: pointer;
+            background: none;
+        }
+        .native-color-picker::-webkit-color-swatch-wrapper {
+            padding: 4px;
+        }
+        .native-color-picker::-webkit-color-swatch {
+            border: none;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+    <script type="module" src="epics.js"></script>
+</body>
+</html>
