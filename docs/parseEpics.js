@@ -84,4 +84,4 @@ function parseEpics(csvString) {
   return result;
 }
 
-module.exports = { parseEpics };
+export { parseEpics };

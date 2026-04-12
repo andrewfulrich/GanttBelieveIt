@@ -1,6 +1,7 @@
 {
   "name": "gantt-believe-it",
   "version": "1.0.0",
+  "type": "module",
   "main": "gantt.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
